@@ -384,8 +384,8 @@ void OpenGLSceneWidget::uploadPanoramaTexture()
     if (!m_glReady || m_panoramaTextureImage.isNull())
         return;
 
-    // OpenGL texture origin is bottom-left; QImage source rows are top-down.
-    const QImage upload = m_panoramaTextureImage.mirrored(false, true).convertToFormat(QImage::Format_RGBA8888);
+    // OpenGL texture origin is bottom-left; QImage source rows are top-down.//.mirrored(false, true)
+    const QImage upload = m_panoramaTextureImage.convertToFormat(QImage::Format_RGBA8888);
 
     m_panoramaTexture.reset();
     m_panoramaTexture = std::make_unique<QOpenGLTexture>(QOpenGLTexture::Target2D);
