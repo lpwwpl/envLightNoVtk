@@ -45,8 +45,16 @@ public:
         double yaw, double pitch, double roll,
         double hfov, double vfov,
         int outW, int outH,
-        double northPanoramaDeg = 180.0,
+        //double northPanoramaDeg = 180.0,
+		const PanoramaBasis& panoramaBasis,
         bool flipVertical = false);
+
+	// World ENU永不动它
+	//修改Panorama ENU
+	void setPanoramaBasis(const PanoramaBasis& basis);
+	//不要删除 World ENU，再增加 Panorama ENU
+	void drawPanoramaAxes(const QMatrix4x4& mvp);
+
 
 signals:
     void perspectiveViewReady(const QImage& image);
@@ -121,6 +129,7 @@ private:
     bool m_textureDirty = false;
     bool m_sphereDirty = true;
     bool m_glReady = false;
+	bool m_wireDirty = true;
 
     double m_cx = 0.5;
     double m_cy = 0.2;
@@ -145,6 +154,8 @@ private:
     float m_viewPitch = 25.0f;
     float m_viewDistance = 3.2f;
     QPoint m_lastMouse;
+
+	PanoramaBasis m_panoramaBasis;
 };
 
 // 2D panorama preview, retained from the former vtk_scene implementation.

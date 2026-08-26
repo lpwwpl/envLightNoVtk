@@ -52,7 +52,19 @@ struct HDRImage {
         return data[static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)];
     }
 };
-
+struct PanoramaBasis
+{
+	// Source panorama coordinate axes expressed in ENU world space.
+	//
+	// source u=0.50 -> north
+	// source u=0.75 -> east
+	// source v=0.00 -> up
+	//
+	// Default is identical to the current northPanoramaDeg = 180 deg.
+	double east[3] = { 1.0, 0.0, 0.0 };
+	double north[3] = { 0.0, 1.0, 0.0 };
+	double up[3] = { 0.0, 0.0, 1.0 };
+};
 class PanoramaProcessor {
 public:
     // Load all supported formats into a scene-linear floating-point image.
@@ -62,13 +74,32 @@ public:
     static bool loadImageEXR(const std::string& filename, HDRImage& img);
     static bool loadImage(const std::string& filename, HDRImage& img);
 
+	// 根据用户输入的 North / Up 自动产生正交右手坐标系。
+	static bool makePanoramaBasisFromNorthUp(
+		double nx, double ny, double nz,
+		double ux, double uy, double uz,
+		PanoramaBasis& basis);
+	// world direction -> source panorama UV
+	static bool directionToPanoramaUV(
+		const double worldDir[3],
+		const PanoramaBasis& basis,
+		double& u,
+		double& v);
+	// source panorama UV -> world direction
+	static void panoramaUVToWorldDirection(
+		double u,
+		double v,
+		const PanoramaBasis& basis,
+		double worldDir[3]);
+
     // Generate a perspective view while preserving HDR floating-point values.
     static HDRImage perspectiveFromPanorama(const HDRImage& pano,
         double cx, double cy, double cz,
         double yaw_deg, double pitch_deg, double roll_deg,
         double hfov_deg, double vfov_deg,
         int outW, int outH, int aa,
-        double northPanoramaDeg = 180.0,
+		const PanoramaBasis& basis,
+        //double northPanoramaDeg = 180.0,
         bool flipVertical = false);
 
     // Display-only conversion: tone map scene-linear HDR to 8-bit sRGB.
@@ -81,18 +112,25 @@ public:
         double yaw_deg, double pitch_deg, double roll_deg,
         double hfov_deg, double vfov_deg,
         int outW, int outH,
-        double northPanoramaDeg = 180.0,
+        //double northPanoramaDeg = 180.0,
+		const PanoramaBasis& basis,
         bool flipVertical = false);
 
     // Helper: ray intersection with unit sphere.
-    static bool raySphereIntersection(const double origin[3], const double dir[3],
-        double& hit_u, double& hit_v);
+    //static bool raySphereIntersection(const double origin[3], const double dir[3],
+    //    double& hit_u, double& hit_v);
+	static bool raySphereIntersection(
+		const double origin[3],
+		const double dir[3],
+		const PanoramaBasis& basis,
+		double& hit_u,
+		double& hit_v);
 
 	static void cameraToPanoramaXYZ(
         double cameraX, double cameraY, double cameraZ,
         double& panoX, double& panoY, double& panoZ);
 
-    static double applyNorthPanoramaOffset(double worldU, double northPanoramaDeg);
+    //static double applyNorthPanoramaOffset(double worldU, double northPanoramaDeg);
 };
 
 #endif // PANORAMA_PROCESSOR_H

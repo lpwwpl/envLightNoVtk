@@ -14,7 +14,12 @@ class QMenuBar;
 
 class PanoramaLabel;
 class OpenGLSceneWidget;
-
+enum class PanoAxis
+{
+	East,
+	North,
+	Up
+};
 class MainWindow : public QMainWindow {
     Q_OBJECT
 public:
@@ -30,6 +35,7 @@ private slots:
 private:
     void setupUI();
     void setupConnections();
+	void updatePanoramaBasis(PanoAxis editedAxis);
 
     OpenGLSceneWidget* m_openGLWidget;
     PanoramaLabel* m_panoramaLabel;
@@ -38,7 +44,7 @@ private:
     QDoubleSpinBox* m_cxSpin, * m_cySpin, * m_czSpin;
     QDoubleSpinBox* m_yawSpin, * m_pitchSpin, * m_rollSpin;
     QDoubleSpinBox* m_hfovSpin, * m_vfovSpin;
-    QDoubleSpinBox* m_northPanoramaSpin;
+    //QDoubleSpinBox* m_northPanoramaSpin;
     QCheckBox* m_flipVerticalCheck;
     QSpinBox* m_outWSpin, * m_outHSpin;
     QPushButton* m_loadBtn;
@@ -46,6 +52,27 @@ private:
 
     CIEWidget* m_cieWidget;
     QMenuBar* m_menuBar;
+
+	///////////////////////////////
+	QDoubleSpinBox* m_panoEastX;
+	QDoubleSpinBox* m_panoEastY;
+	QDoubleSpinBox* m_panoEastZ;
+
+	QDoubleSpinBox* m_panoNorthX;
+	QDoubleSpinBox* m_panoNorthY;
+	QDoubleSpinBox* m_panoNorthZ;
+
+	QDoubleSpinBox* m_panoUpX;
+	QDoubleSpinBox* m_panoUpY;
+	QDoubleSpinBox* m_panoUpZ;
+
+	PanoramaBasis m_panoramaBasis;
+
+	PanoAxis m_prevPanoAxis = PanoAxis::North;
+	PanoAxis m_lastPanoAxis = PanoAxis::Up;
+
+	bool m_updatingPanoramaUI = false;
+
 
     HDRImage m_panorama;
     bool m_hasPanorama;

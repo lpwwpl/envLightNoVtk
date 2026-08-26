@@ -32,6 +32,40 @@
 // ----------------------------------------------------------------------
 namespace {
 
+	inline double dot3(const double a[3], const double b[3])
+	{
+		return a[0] * b[0]
+			+ a[1] * b[1]
+			+ a[2] * b[2];
+	}
+
+	inline void cross3(
+		const double a[3],
+		const double b[3],
+		double r[3])
+	{
+		r[0] = a[1] * b[2] - a[2] * b[1];
+		r[1] = a[2] * b[0] - a[0] * b[2];
+		r[2] = a[0] * b[1] - a[1] * b[0];
+	}
+
+	inline bool normalize3(double v[3])
+	{
+		const double len =
+			std::sqrt(v[0] * v[0] +
+				v[1] * v[1] +
+				v[2] * v[2]);
+
+		if (len < 1e-10)
+			return false;
+
+		v[0] /= len;
+		v[1] /= len;
+		v[2] /= len;
+
+		return true;
+	}
+
     float srgbToLinear(float c) {
         c = std::max(0.0f, std::min(1.0f, c));
         if (c <= 0.04045f) return c / 12.92f;
@@ -239,29 +273,92 @@ namespace {
     }
 
     // 射线与单位球面求交
-    bool raySphereIntersection(const double origin[3], const double dir[3],
-        double& hit_u, double& hit_v) {
-        double a = dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2];
-        double b = 2.0 * (origin[0] * dir[0] + origin[1] * dir[1] + origin[2] * dir[2]);
-        double c = origin[0] * origin[0] + origin[1] * origin[1] + origin[2] * origin[2] - 1.0;
-        double disc = b * b - 4.0 * a * c;
-        if (disc < 0.0) return false;
-        double sqrt_disc = sqrt(disc);
-        double t1 = (-b - sqrt_disc) / (2.0 * a);
-        double t2 = (-b + sqrt_disc) / (2.0 * a);
-        double t = (t1 > 1e-6) ? t1 : ((t2 > 1e-6) ? t2 : -1.0);
-        if (t <= 1e-6) return false;
-        double hit_x = origin[0] + t * dir[0];
-        double hit_y = origin[1] + t * dir[1];
-        double hit_z = origin[2] + t * dir[2];
+    //bool raySphereIntersection(const double origin[3], const double dir[3],
+    //    double& hit_u, double& hit_v) {
+    //    double a = dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2];
+    //    double b = 2.0 * (origin[0] * dir[0] + origin[1] * dir[1] + origin[2] * dir[2]);
+    //    double c = origin[0] * origin[0] + origin[1] * origin[1] + origin[2] * origin[2] - 1.0;
+    //    double disc = b * b - 4.0 * a * c;
+    //    if (disc < 0.0) return false;
+    //    double sqrt_disc = sqrt(disc);
+    //    double t1 = (-b - sqrt_disc) / (2.0 * a);
+    //    double t2 = (-b + sqrt_disc) / (2.0 * a);
+    //    double t = (t1 > 1e-6) ? t1 : ((t2 > 1e-6) ? t2 : -1.0);
+    //    if (t <= 1e-6) return false;
+    //    double hit_x = origin[0] + t * dir[0];
+    //    double hit_y = origin[1] + t * dir[1];
+    //    double hit_z = origin[2] + t * dir[2];
 
-        // ENU world: +X East, +Y North, +Z Up.
-        hit_z = std::max(-1.0, std::min(1.0, hit_z));
-        const double azimuth = atan2(hit_x, hit_y);
-        hit_u = (azimuth + M_PI) / (2.0 * M_PI);
-        hit_v = acos(hit_z) / M_PI;
-        return true;
-    }
+    //    // ENU world: +X East, +Y North, +Z Up.
+    //    hit_z = std::max(-1.0, std::min(1.0, hit_z));
+    //    const double azimuth = atan2(hit_x, hit_y);
+    //    hit_u = (azimuth + M_PI) / (2.0 * M_PI);
+    //    hit_v = acos(hit_z) / M_PI;
+    //    return true;
+    //}
+
+	bool raySphereIntersection(
+		const double origin[3],
+		const double dir[3],
+		const PanoramaBasis& basis,
+		double& hit_u,
+		double& hit_v)
+	{
+		const double a =
+			dir[0] * dir[0]
+			+ dir[1] * dir[1]
+			+ dir[2] * dir[2];
+
+		const double b =
+			2.0 *
+			(
+				origin[0] * dir[0]
+				+ origin[1] * dir[1]
+				+ origin[2] * dir[2]
+				);
+
+		const double c =
+			origin[0] * origin[0]
+			+ origin[1] * origin[1]
+			+ origin[2] * origin[2]
+			- 1.0;
+
+		const double disc =
+			b * b - 4.0 * a * c;
+
+		if (disc < 0.0)
+			return false;
+
+		const double root =
+			std::sqrt(disc);
+
+		const double t1 =
+			(-b - root) / (2.0 * a);
+
+		const double t2 =
+			(-b + root) / (2.0 * a);
+
+		const double t =
+			(t1 > 1e-6)
+			? t1
+			: ((t2 > 1e-6) ? t2 : -1.0);
+
+		if (t <= 1e-6)
+			return false;
+
+		const double hit[3] =
+		{
+			origin[0] + t * dir[0],
+			origin[1] + t * dir[1],
+			origin[2] + t * dir[2]
+		};
+
+		return PanoramaProcessor::directionToPanoramaUV(
+			hit,
+			basis,
+			hit_u,
+			hit_v);
+	}
 
     // Bilinear sampling in scene-linear float; never quantize here.
     LinearRGB samplePanoramaBilinear(const HDRImage& pano, double u, double v) {
@@ -362,16 +459,32 @@ bool PanoramaProcessor::loadImage(const std::string& filename, HDRImage& img) {
     return false;
 }
 
-bool PanoramaProcessor::raySphereIntersection(const double origin[3], const double dir[3],
-    double& hit_u, double& hit_v) {
-    return ::raySphereIntersection(origin, dir, hit_u, hit_v);
+//bool PanoramaProcessor::raySphereIntersection(const double origin[3], const double dir[3],
+//    double& hit_u, double& hit_v) {
+//    return ::raySphereIntersection(origin, dir, hit_u, hit_v);
+//}
+bool PanoramaProcessor::raySphereIntersection(
+	const double origin[3],
+	const double dir[3],
+	const PanoramaBasis& basis,
+	double& hit_u,
+	double& hit_v)
+{
+	return ::raySphereIntersection(
+		origin,
+		dir,
+		basis,
+		hit_u,
+		hit_v);
 }
+
 std::vector<QPointF> PanoramaProcessor::computeCornerUVs(
     double cx, double cy, double cz,
     double yaw_deg, double pitch_deg, double roll_deg,
     double hfov_deg, double vfov_deg,
     int outW, int outH,
-    double northPanoramaDeg,
+    //double northPanoramaDeg,
+	const PanoramaBasis& basis,
     bool flipVertical)
 {
     std::vector<QPointF> polygon;
@@ -397,12 +510,22 @@ std::vector<QPointF> PanoramaProcessor::computeCornerUVs(
 
         double u = 0.0;
         double v = 0.0;
-        if (raySphereIntersection(rayCtx.originENU, dir, u, v))
-        {
-            u = PanoramaProcessor::applyNorthPanoramaOffset(u, northPanoramaDeg);
-            result = QPointF(u, v);
-            return true;
-        }
+        //if (raySphereIntersection(rayCtx.originENU, dir, u, v))
+        //{
+        //    u = PanoramaProcessor::applyNorthPanoramaOffset(u, northPanoramaDeg);
+        //    result = QPointF(u, v);
+        //    return true;
+        //}
+		if (raySphereIntersection(
+			rayCtx.originENU,
+			dir,
+			basis,
+			u,
+			v))
+		{
+			result = QPointF(u, v);
+			return true;
+		}
         return false;
     };
 
@@ -451,7 +574,8 @@ HDRImage PanoramaProcessor::perspectiveFromPanorama(const HDRImage& pano,
     double yaw_deg, double pitch_deg, double roll_deg,
     double hfov_deg, double vfov_deg,
     int outW, int outH, int aa,
-    double northPanoramaDeg,
+	const PanoramaBasis& basis,
+    //double northPanoramaDeg,
     bool flipVertical)
 {
     HDRImage output(outW, outH);
@@ -502,16 +626,31 @@ HDRImage PanoramaProcessor::perspectiveFromPanorama(const HDRImage& pano,
 
                     double u = 0.0;
                     double v = 0.0;
-                    if (raySphereIntersection(rayCtx.originENU, dir, u, v) &&
-                        v >= 0.0 && v <= 1.0)
-                    {
-                        u = PanoramaProcessor::applyNorthPanoramaOffset(u, northPanoramaDeg);
-                        const LinearRGB col = samplePanoramaBilinear(pano, u, v);
-                        r_sum += col.r;
-                        g_sum += col.g;
-                        b_sum += col.b;
-                        ++valid;
-                    }
+					if (raySphereIntersection(
+						rayCtx.originENU,
+						dir,
+						basis,
+						u,
+						v) &&
+						v >= 0.0 && v <= 1.0)
+					{
+						const LinearRGB col =
+							samplePanoramaBilinear(pano, u, v);
+							r_sum += col.r;
+							g_sum += col.g;
+							b_sum += col.b;
+							++valid;
+					}
+                    //if (raySphereIntersection(rayCtx.originENU, dir, u, v) &&
+                    //    v >= 0.0 && v <= 1.0)
+                    //{
+                    //    u = PanoramaProcessor::applyNorthPanoramaOffset(u, northPanoramaDeg);
+                    //    const LinearRGB col = samplePanoramaBilinear(pano, u, v);
+                    //    r_sum += col.r;
+                    //    g_sum += col.g;
+                    //    b_sum += col.b;
+                    //    ++valid;
+                    //}
                 }
             }
 
@@ -647,16 +786,145 @@ void PanoramaProcessor::cameraToPanoramaXYZ(
 	panoY = cameraX;
 	panoZ = cameraY;
 }
-double PanoramaProcessor::applyNorthPanoramaOffset(double worldU, double northPanoramaDeg)
-{
-    // northPanoramaDeg is the horizontal position of geographic North in the
-    // SOURCE panorama: 0 deg = left seam, 180 deg = image center, 360 deg = seam.
-    double northU = std::fmod(northPanoramaDeg, 360.0) / 360.0;
-    if (northU < 0.0) northU += 1.0;
+//double PanoramaProcessor::applyNorthPanoramaOffset(double worldU, double northPanoramaDeg)
+//{
+//    // northPanoramaDeg is the horizontal position of geographic North in the
+//    // SOURCE panorama: 0 deg = left seam, 180 deg = image center, 360 deg = seam.
+//    double northU = std::fmod(northPanoramaDeg, 360.0) / 360.0;
+//    if (northU < 0.0) northU += 1.0;
+//
+//    // In the ENU world panorama convention North is worldU=0.5.
+//    double sourceU = worldU + (northU - 0.5);
+//    sourceU = std::fmod(sourceU, 1.0);
+//    if (sourceU < 0.0) sourceU += 1.0;
+//    return sourceU;
+//}
 
-    // In the ENU world panorama convention North is worldU=0.5.
-    double sourceU = worldU + (northU - 0.5);
-    sourceU = std::fmod(sourceU, 1.0);
-    if (sourceU < 0.0) sourceU += 1.0;
-    return sourceU;
+
+bool PanoramaProcessor::makePanoramaBasisFromNorthUp(
+	double nx, double ny, double nz,
+	double ux, double uy, double uz,
+	PanoramaBasis& basis)
+{
+	double n[3] = { nx, ny, nz };
+	double u[3] = { ux, uy, uz };
+
+	if (!normalize3(n) || !normalize3(u))
+		return false;
+
+	// Up 优先。
+	// 从 North 中移除沿 Up 的分量。
+	const double d = dot3(n, u);
+
+	n[0] -= d * u[0];
+	n[1] -= d * u[1];
+	n[2] -= d * u[2];
+
+	if (!normalize3(n))
+		return false;
+
+	// ENU-style right handed frame:
+	//
+	// E = N x U
+	double e[3];
+	cross3(n, u, e);
+
+	if (!normalize3(e))
+		return false;
+
+	// 再算一次 N，消除输入误差。
+	//
+	// N = U x E
+	cross3(u, e, n);
+
+	if (!normalize3(n))
+		return false;
+
+	for (int i = 0; i < 3; ++i)
+	{
+		basis.east[i] = e[i];
+		basis.north[i] = n[i];
+		basis.up[i] = u[i];
+	}
+
+	return true;
+}
+bool PanoramaProcessor::directionToPanoramaUV(
+	const double worldDir[3],
+	const PanoramaBasis& basis,
+	double& u,
+	double& v)
+{
+	double d[3] =
+	{
+		worldDir[0],
+		worldDir[1],
+		worldDir[2]
+	};
+
+	if (!normalize3(d))
+		return false;
+
+	// World -> panorama local coordinate system.
+	const double localEast = dot3(d, basis.east);
+	const double localNorth = dot3(d, basis.north);
+
+	double localUp = dot3(d, basis.up);
+
+	localUp = std::max(
+		-1.0,
+		std::min(1.0, localUp));
+
+	// Keep exactly the same equirectangular convention currently
+	// used by envLightNoVtk.
+	const double azimuth =
+		std::atan2(localEast, localNorth);
+
+	u = (azimuth + M_PI) / (2.0 * M_PI);
+
+	if (u < 0.0)
+		u += 1.0;
+
+	if (u >= 1.0)
+		u -= 1.0;
+
+	v = std::acos(localUp) / M_PI;
+
+	return true;
+}
+
+
+void PanoramaProcessor::panoramaUVToWorldDirection(
+	double u,
+	double v,
+	const PanoramaBasis& basis,
+	double worldDir[3])
+{
+	const double theta =
+		v * M_PI;
+
+	const double azimuth =
+		u * 2.0 * M_PI - M_PI;
+
+	const double horizontal =
+		std::sin(theta);
+
+	// Panorama-local ENU.
+	const double localEast =
+		horizontal * std::sin(azimuth);
+
+	const double localNorth =
+		horizontal * std::cos(azimuth);
+
+	const double localUp =
+		std::cos(theta);
+
+	// panorama local -> ENU world
+	for (int i = 0; i < 3; ++i)
+	{
+		worldDir[i] =
+			localEast * basis.east[i]
+			+ localNorth * basis.north[i]
+			+ localUp * basis.up[i];
+	}
 }

@@ -44,6 +44,56 @@ QImage toQImage(const Image& img)
     }
     return qimg;
 }
+
+inline QVector3D panoramaLocalToWorld(
+	double east,
+	double north,
+	double up,
+	const PanoramaBasis& basis)
+{
+	return QVector3D(
+		static_cast<float>(
+			east  * basis.east[0]
+			+ north * basis.north[0]
+			+ up * basis.up[0]),
+
+		static_cast<float>(
+			east  * basis.east[1]
+			+ north * basis.north[1]
+			+ up * basis.up[1]),
+
+		static_cast<float>(
+			east  * basis.east[2]
+			+ north * basis.north[2]
+			+ up * basis.up[2]));
+}
+
+inline QVector3D panoramaEast(
+	const PanoramaBasis& basis)
+{
+	return QVector3D(
+		static_cast<float>(basis.east[0]),
+		static_cast<float>(basis.east[1]),
+		static_cast<float>(basis.east[2]));
+}
+
+inline QVector3D panoramaNorth(
+	const PanoramaBasis& basis)
+{
+	return QVector3D(
+		static_cast<float>(basis.north[0]),
+		static_cast<float>(basis.north[1]),
+		static_cast<float>(basis.north[2]));
+}
+
+inline QVector3D panoramaUp(
+	const PanoramaBasis& basis)
+{
+	return QVector3D(
+		static_cast<float>(basis.up[0]),
+		static_cast<float>(basis.up[1]),
+		static_cast<float>(basis.up[2]));
+}
 }
 
 OpenGLSceneWidget::OpenGLSceneWidget(QWidget* parent)
@@ -88,7 +138,8 @@ void OpenGLSceneWidget::setCameraParameters(
     double yaw, double pitch, double roll,
     double hfov, double vfov,
     int outW, int outH,
-    double northPanoramaDeg,
+    //double northPanoramaDeg,
+	const PanoramaBasis& panoramaBasis,
     bool flipVertical)
 {
     m_cx = cx;
@@ -103,11 +154,39 @@ void OpenGLSceneWidget::setCameraParameters(
     m_outH = outH;
     m_flipVertical = flipVertical;
 
-    const double normalizedNorth = wrap360(northPanoramaDeg);
-    if (std::abs(normalizedNorth - m_northPanoramaDeg) > 1e-9) {
-        m_northPanoramaDeg = normalizedNorth;
-        m_sphereDirty = true;
-    }
+    //const double normalizedNorth = wrap360(northPanoramaDeg);
+    //if (std::abs(normalizedNorth - m_northPanoramaDeg) > 1e-9) {
+    //    m_northPanoramaDeg = normalizedNorth;
+    //    m_sphereDirty = true;
+    //}
+	bool basisChanged = false;
+
+	for (int i = 0; i < 3; ++i)
+	{
+		if (std::abs(
+			m_panoramaBasis.east[i]
+			- panoramaBasis.east[i]) > 1e-8 ||
+			std::abs(
+				m_panoramaBasis.north[i]
+				- panoramaBasis.north[i]) > 1e-8 ||
+			std::abs(
+				m_panoramaBasis.up[i]
+				- panoramaBasis.up[i]) > 1e-8)
+		{
+			basisChanged = true;
+			break;
+		}
+	}
+
+	if (basisChanged)
+	{
+		m_panoramaBasis = panoramaBasis;
+
+		// Sphere vertices carry source UV, so changing the panorama
+		// coordinate system requires rebuilding their world positions.
+		m_sphereDirty = true;
+		m_wireDirty = true;
+	}
 
     updateSceneGeometry();
     updatePerspective();
@@ -151,7 +230,8 @@ void OpenGLSceneWidget::paintGL()
         rebuildSphereMesh();
     if (m_textureDirty)
         uploadPanoramaTexture();
-
+	if (m_wireDirty)
+		rebuildWireSphere();
     const float yaw = qDegreesToRadians(m_viewYaw);
     const float pitch = qDegreesToRadians(m_viewPitch);
     const float cp = std::cos(pitch);
@@ -172,7 +252,13 @@ void OpenGLSceneWidget::paintGL()
 
     drawTexturedSphere(mvp);
     drawWireSphere(mvp);
+	// 固定世界 ENU
     drawWorldAxes(mvp);
+
+	// 随全景图旋转的 ENU
+	drawPanoramaAxes(mvp);
+
+
     drawCameraAxes(mvp);
     drawFrustumAndROI(mvp);
     drawCameraMarker(mvp);
@@ -272,34 +358,92 @@ void OpenGLSceneWidget::rebuildSphereMesh()
     vertices.reserve((azimuthSegments + 1) * (zenithSegments + 1));
     indices.reserve(azimuthSegments * zenithSegments * 6);
 
-    const double northU = wrap360(m_northPanoramaDeg) / 360.0;
-    const double offset = northU - 0.5;
+    //const double northU = wrap360(m_northPanoramaDeg) / 360.0;
+    //const double offset = northU - 0.5;
 
     // The seam follows source panorama u=0/1. Geometry is rotated in ENU so
     // source North appears at northPanoramaDeg while UV remains continuous.
-    for (int j = 0; j <= zenithSegments; ++j) {
-        const double sourceV = static_cast<double>(j) / zenithSegments;
-        const double theta = sourceV * kPi;
-        const double horizontal = std::sin(theta);
-        const double up = std::cos(theta);
+    //for (int j = 0; j <= zenithSegments; ++j) {
+    //    const double sourceV = static_cast<double>(j) / zenithSegments;
+    //    const double theta = sourceV * kPi;
+    //    const double horizontal = std::sin(theta);
+    //    const double up = std::cos(theta);
 
-        for (int i = 0; i <= azimuthSegments; ++i) {
-            const double sourceU = static_cast<double>(i) / azimuthSegments;
+    //    for (int i = 0; i <= azimuthSegments; ++i) {
+    //        const double sourceU = static_cast<double>(i) / azimuthSegments;
 
-            double worldU = sourceU - offset;
-            worldU = std::fmod(worldU, 1.0);
-            if (worldU < 0.0) worldU += 1.0;
+    //        double worldU = sourceU - offset;
+    //        worldU = std::fmod(worldU, 1.0);
+    //        if (worldU < 0.0) worldU += 1.0;
 
-            const double azimuth = worldU * 2.0 * kPi - kPi;
-            const double east = horizontal * std::sin(azimuth);
-            const double north = horizontal * std::cos(azimuth);
+    //        const double azimuth = worldU * 2.0 * kPi - kPi;
+    //        const double east = horizontal * std::sin(azimuth);
+    //        const double north = horizontal * std::cos(azimuth);
 
-            vertices.push_back({
-                QVector3D(static_cast<float>(east), static_cast<float>(north), static_cast<float>(up)),
-                QVector2D(static_cast<float>(sourceU), static_cast<float>(sourceV))
-            });
-        }
-    }
+    //        vertices.push_back({
+    //            QVector3D(static_cast<float>(east), static_cast<float>(north), static_cast<float>(up)),
+    //            QVector2D(static_cast<float>(sourceU), static_cast<float>(sourceV))
+    //        });
+    //    }
+    //}
+	for (int j = 0; j <= zenithSegments; ++j)
+	{
+		const double sourceV =
+			static_cast<double>(j) /
+			zenithSegments;
+
+		const double theta =
+			sourceV * kPi;
+
+		const double horizontal =
+			std::sin(theta);
+
+		const double localUp =
+			std::cos(theta);
+
+		for (int i = 0; i <= azimuthSegments; ++i)
+		{
+			const double sourceU =
+				static_cast<double>(i) /
+				azimuthSegments;
+
+			const double azimuth =
+				sourceU * 2.0 * kPi - kPi;
+
+			// Source panorama-local coordinate.
+			const double localEast =
+				horizontal * std::sin(azimuth);
+
+			const double localNorth =
+				horizontal * std::cos(azimuth);
+
+			// Panorama local -> ENU world.
+			QVector3D worldPosition(
+				static_cast<float>(
+					localEast  * m_panoramaBasis.east[0]
+					+ localNorth * m_panoramaBasis.north[0]
+					+ localUp * m_panoramaBasis.up[0]),
+
+				static_cast<float>(
+					localEast  * m_panoramaBasis.east[1]
+					+ localNorth * m_panoramaBasis.north[1]
+					+ localUp * m_panoramaBasis.up[1]),
+
+				static_cast<float>(
+					localEast  * m_panoramaBasis.east[2]
+					+ localNorth * m_panoramaBasis.north[2]
+					+ localUp * m_panoramaBasis.up[2])
+			);
+
+			vertices.push_back(
+				{
+					worldPosition,
+					QVector2D(
+						static_cast<float>(sourceU),
+						static_cast<float>(sourceV))
+				});
+		}
+	}
 
     const int stride = azimuthSegments + 1;
     for (int j = 0; j < zenithSegments; ++j) {
@@ -342,41 +486,138 @@ void OpenGLSceneWidget::rebuildWireSphere()
 {
     m_wireVertices.clear();
     constexpr int segments = 96;
+	constexpr double R = 1.006;
 
+	//更新经纬度（非必要的部分），可有可无
+	// ---------------------------------
+	// 纬线
+	// ---------------------------------
+	for (int altDeg = -75;
+		altDeg <= 75;
+		altDeg += 15)
+	{
+		const double alt =
+			altDeg * kPi / 180.0;
+
+		const double horizontal =
+			std::cos(alt) * R;
+
+		const double localUp =
+			std::sin(alt) * R;
+
+		for (int i = 0; i < segments; ++i)
+		{
+			const double a0 =
+				2.0 * kPi *
+				i / segments;
+
+			const double a1 =
+				2.0 * kPi *
+				(i + 1) / segments;
+
+			const QVector3D p0 =
+				panoramaLocalToWorld(
+					horizontal * std::sin(a0),
+					horizontal * std::cos(a0),
+					localUp,
+					m_panoramaBasis);
+
+			const QVector3D p1 =
+				panoramaLocalToWorld(
+					horizontal * std::sin(a1),
+					horizontal * std::cos(a1),
+					localUp,
+					m_panoramaBasis);
+
+			m_wireVertices.push_back(p0);
+			m_wireVertices.push_back(p1);
+		}
+	}
+
+	// ---------------------------------
+	// 经线
+	// ---------------------------------
+	for (int azDeg = 0;
+		azDeg < 360;
+		azDeg += 15)
+	{
+		const double az =
+			azDeg * kPi / 180.0;
+
+		for (int i = 0;
+			i < segments / 2;
+			++i)
+		{
+			const double t0 =
+				-kPi / 2.0 +
+				kPi * i /
+				(segments / 2);
+
+			const double t1 =
+				-kPi / 2.0 +
+				kPi * (i + 1) /
+				(segments / 2);
+
+			const double h0 =
+				std::cos(t0) * R;
+
+			const double h1 =
+				std::cos(t1) * R;
+
+			const QVector3D p0 =
+				panoramaLocalToWorld(
+					h0 * std::sin(az),
+					h0 * std::cos(az),
+					std::sin(t0) * R,
+					m_panoramaBasis);
+
+			const QVector3D p1 =
+				panoramaLocalToWorld(
+					h1 * std::sin(az),
+					h1 * std::cos(az),
+					std::sin(t1) * R,
+					m_panoramaBasis);
+
+			m_wireVertices.push_back(p0);
+			m_wireVertices.push_back(p1);
+		}
+		m_wireDirty = false;
+	}
+	//原先经纬度不更新
     // Altitude circles, excluding the poles and equator duplicated by meridians.
-    for (int altDeg = -75; altDeg <= 75; altDeg += 15) {
-        const double alt = altDeg * kPi / 180.0;
-        const double r = std::cos(alt) * 1.006;
-        const double z = std::sin(alt) * 1.006;
-        for (int i = 0; i < segments; ++i) {
-            const double a0 = 2.0 * kPi * i / segments;
-            const double a1 = 2.0 * kPi * (i + 1) / segments;
-            m_wireVertices.emplace_back(
-                static_cast<float>(r * std::sin(a0)),
-                static_cast<float>(r * std::cos(a0)),
-                static_cast<float>(z));
-            m_wireVertices.emplace_back(
-                static_cast<float>(r * std::sin(a1)),
-                static_cast<float>(r * std::cos(a1)),
-                static_cast<float>(z));
-        }
-    }
+    //for (int altDeg = -75; altDeg <= 75; altDeg += 15) {
+    //    const double alt = altDeg * kPi / 180.0;
+    //    const double r = std::cos(alt) * 1.006;
+    //    const double z = std::sin(alt) * 1.006;
+    //    for (int i = 0; i < segments; ++i) {
+    //        const double a0 = 2.0 * kPi * i / segments;
+    //        const double a1 = 2.0 * kPi * (i + 1) / segments;
+    //        m_wireVertices.emplace_back(
+    //            static_cast<float>(r * std::sin(a0)),
+    //            static_cast<float>(r * std::cos(a0)),
+    //            static_cast<float>(z));
+    //        m_wireVertices.emplace_back(
+    //            static_cast<float>(r * std::sin(a1)),
+    //            static_cast<float>(r * std::cos(a1)),
+    //            static_cast<float>(z));
+    //    }
+    //}
 
-    // Azimuth meridians.
-    for (int azDeg = 0; azDeg < 360; azDeg += 15) {
-        const double az = azDeg * kPi / 180.0;
-        for (int i = 0; i < segments / 2; ++i) {
-            const double t0 = -kPi / 2.0 + kPi * i / (segments / 2);
-            const double t1 = -kPi / 2.0 + kPi * (i + 1) / (segments / 2);
-            for (double t : {t0, t1}) {
-                const double h = std::cos(t) * 1.006;
-                m_wireVertices.emplace_back(
-                    static_cast<float>(h * std::sin(az)),
-                    static_cast<float>(h * std::cos(az)),
-                    static_cast<float>(std::sin(t) * 1.006));
-            }
-        }
-    }
+    //// Azimuth meridians.
+    //for (int azDeg = 0; azDeg < 360; azDeg += 15) {
+    //    const double az = azDeg * kPi / 180.0;
+    //    for (int i = 0; i < segments / 2; ++i) {
+    //        const double t0 = -kPi / 2.0 + kPi * i / (segments / 2);
+    //        const double t1 = -kPi / 2.0 + kPi * (i + 1) / (segments / 2);
+    //        for (double t : {t0, t1}) {
+    //            const double h = std::cos(t) * 1.006;
+    //            m_wireVertices.emplace_back(
+    //                static_cast<float>(h * std::sin(az)),
+    //                static_cast<float>(h * std::cos(az)),
+    //                static_cast<float>(std::sin(t) * 1.006));
+    //        }
+    //    }
+    //}
 }
 
 void OpenGLSceneWidget::uploadPanoramaTexture()
@@ -446,7 +687,8 @@ void OpenGLSceneWidget::updatePerspective()
         m_hfov, m_vfov,
         m_outW, m_outH,
         2,
-        m_northPanoramaDeg,
+		m_panoramaBasis,
+        //m_northPanoramaDeg,
         m_flipVertical);
 
     const Image display = PanoramaProcessor::toneMapForDisplay(hdr, 1.0f, 2.2f);
@@ -627,6 +869,19 @@ void OpenGLSceneWidget::paintAxisLabels(const QMatrix4x4& mvp)
     label(QVector3D(0,1.35f,0), "N", QColor(80,240,100));
     label(QVector3D(0,0,1.35f), "U", QColor(80,150,255));
 
+	// 在这里加入：
+	const QVector3D pe = panoramaEast(m_panoramaBasis);
+	const QVector3D pn = panoramaNorth(m_panoramaBasis);
+	const QVector3D pu = panoramaUp(m_panoramaBasis);
+	constexpr float PL = 1.50f;
+	label(pe * PL, "pE",
+		QColor(255, 125, 55));
+	label(pn * PL, "pN",
+		QColor(70, 255, 165));
+	label(pu * PL, "pU",
+		QColor(210, 120, 255));
+
+
     if (m_rayContextValid) {
         const QVector3D o(
             static_cast<float>(m_rayCtx.originENU[0]),
@@ -640,9 +895,38 @@ void OpenGLSceneWidget::paintAxisLabels(const QMatrix4x4& mvp)
         label(o + L * QVector3D(z[0],z[1],z[2]), "Zc / Forward", QColor(255,205,50));
     }
 
-    p.setPen(QColor(220,220,225));
-    p.drawText(10, 20, "ENU world: X=East, Y=North, Z=Up");
-    p.drawText(10, 40, "Mouse: left-drag orbit, wheel zoom");
+    //p.setPen(QColor(220,220,225));
+    //p.drawText(10, 20, "ENU world: X=East, Y=North, Z=Up");
+    //p.drawText(10, 40, "Mouse: left-drag orbit, wheel zoom");
+	p.setPen(QColor(220, 220, 225));
+
+	p.drawText(
+		10,
+		20,
+		"World ENU: E=(1,0,0) N=(0,1,0) U=(0,0,1)");
+
+	p.drawText(
+		10,
+		40,
+		QString(
+			"Panorama N=(%1,%2,%3)")
+		.arg(m_panoramaBasis.north[0], 0, 'f', 3)
+		.arg(m_panoramaBasis.north[1], 0, 'f', 3)
+		.arg(m_panoramaBasis.north[2], 0, 'f', 3));
+
+	p.drawText(
+		10,
+		60,
+		QString(
+			"Panorama U=(%1,%2,%3)")
+		.arg(m_panoramaBasis.up[0], 0, 'f', 3)
+		.arg(m_panoramaBasis.up[1], 0, 'f', 3)
+		.arg(m_panoramaBasis.up[2], 0, 'f', 3));
+
+	p.drawText(
+		10,
+		80,
+		"Mouse: left-drag orbit, wheel zoom");
 }
 
 bool OpenGLSceneWidget::raySphereIntersectionPoint(
@@ -746,4 +1030,90 @@ void PanoramaLabel::paintEvent(QPaintEvent* event)
         if (poly.size() > 2)
             painter.drawLine(poly.last(), poly.first());
     }
+}
+
+void OpenGLSceneWidget::setPanoramaBasis(
+	const PanoramaBasis& basis)
+{
+	bool changed = false;
+
+	for (int i = 0; i < 3; ++i)
+	{
+		if (std::abs(
+			m_panoramaBasis.east[i] -
+			basis.east[i]) > 1e-9 ||
+			std::abs(
+				m_panoramaBasis.north[i] -
+				basis.north[i]) > 1e-9 ||
+			std::abs(
+				m_panoramaBasis.up[i] -
+				basis.up[i]) > 1e-9)
+		{
+			changed = true;
+			break;
+		}
+	}
+
+	if (!changed)
+		return;
+
+	m_panoramaBasis = basis;
+
+	// UV 不变，但是球上的 UV -> world position
+	// 关系发生变化。
+	m_sphereDirty = true;
+	// 经纬线也必须根据 Panorama ENU 更新
+	m_wireDirty = true;
+	// 灰色经纬网属于 Panorama 球自身，
+	// 所以也必须跟随 PanoramaBasis。
+	rebuildWireSphere();
+
+	// Perspective 也必须使用新的 basis 重新采样。
+	updatePerspective();
+
+	update();
+}
+
+void OpenGLSceneWidget::drawPanoramaAxes(
+	const QMatrix4x4& mvp)
+{
+	const QVector3D origin(0, 0, 0);
+
+	const QVector3D e =
+		panoramaEast(m_panoramaBasis);
+
+	const QVector3D n =
+		panoramaNorth(m_panoramaBasis);
+
+	const QVector3D u =
+		panoramaUp(m_panoramaBasis);
+
+	constexpr float L = 1.48f;
+
+	// Panorama East
+	drawLines(
+		{ origin, e * L },
+		QVector4D(
+			1.0f, 0.45f, 0.20f, 1.0f),
+		mvp,
+		GL_LINES,
+		4.0f);
+
+	// Panorama North
+	drawLines(
+		{ origin, n * L },
+		QVector4D(
+			0.25f, 1.0f, 0.65f, 1.0f),
+		mvp,
+		GL_LINES,
+		4.0f);
+
+	// Panorama Up
+	drawLines(
+		{ origin, u * L },
+		QVector4D(
+			0.80f, 0.45f, 1.0f, 1.0f),
+		mvp,
+		GL_LINES,
+		4.0f);
 }
