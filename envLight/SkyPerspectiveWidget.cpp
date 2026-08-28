@@ -39,55 +39,46 @@ SkyPerspectiveWidget::SkyPerspectiveWidget(QWidget* parent)
         &SkyPerspectiveWidget::advanceWeatherAnimation);
 }
 
-void SkyPerspectiveWidget::setParameters(
-    const SkyPerspectiveParameters& parameters)
+void SkyPerspectiveWidget::setParameters(const SkyPerspectiveParameters& parameters)
 {
-    m_parameters = parameters;
+	m_parameters = parameters;
 
-    m_parameters.cieSkyType =
-        std::max(0, std::min(14, m_parameters.cieSkyType));
+	m_parameters.cieSkyType = std::max(0, std::min(14, m_parameters.cieSkyType));
 
-    while (m_parameters.cameraAzimuthDeg < 0.0)
-        m_parameters.cameraAzimuthDeg += 360.0;
-    while (m_parameters.cameraAzimuthDeg >= 360.0)
-        m_parameters.cameraAzimuthDeg -= 360.0;
+	while (m_parameters.cameraAzimuthDeg < 0.0)
+		m_parameters.cameraAzimuthDeg += 360.0;
+	while (m_parameters.cameraAzimuthDeg >= 360.0)
+		m_parameters.cameraAzimuthDeg -= 360.0;
 
-    m_parameters.cameraPitchDeg =
-        clamp(m_parameters.cameraPitchDeg, -89.0, 89.0);
-    m_parameters.verticalFovDeg =
-        clamp(m_parameters.verticalFovDeg, 10.0, 170.0);
+	m_parameters.cameraPitchDeg = clamp(m_parameters.cameraPitchDeg, -89.0, 89.0);
+	m_parameters.verticalFovDeg = clamp(m_parameters.verticalFovDeg, 10.0, 170.0);
+	m_parameters.cameraRollDeg = clamp(m_parameters.cameraRollDeg, -180.0, 180.0);
+	m_parameters.horizontalFovDeg = clamp(m_parameters.horizontalFovDeg, 10.0, 170.0);
 
-    m_parameters.targetValue =
-        std::max(0.0, m_parameters.targetValue);
-    m_parameters.directNormalValue =
-        std::max(0.0, m_parameters.directNormalValue);
-    m_parameters.displayReferenceValue =
-        std::max(1.0e-9, m_parameters.displayReferenceValue);
-    m_parameters.exposure =
-        std::max(0.001, m_parameters.exposure);
-    m_parameters.gamma =
-        std::max(0.1, m_parameters.gamma);
-    m_parameters.sunAngularRadiusDeg =
-        clamp(m_parameters.sunAngularRadiusDeg, 0.05, 5.0);
+	m_parameters.targetValue = std::max(0.0, m_parameters.targetValue);
+	m_parameters.directNormalValue = std::max(0.0, m_parameters.directNormalValue);
+	m_parameters.displayReferenceValue = std::max(1.0e-9, m_parameters.displayReferenceValue);
+	m_parameters.exposure = std::max(0.001, m_parameters.exposure);
+	m_parameters.gamma = std::max(0.1, m_parameters.gamma);
+	m_parameters.sunAngularRadiusDeg = clamp(m_parameters.sunAngularRadiusDeg, 0.05, 5.0);
 
-    if (m_parameters.sunDirection.lengthSquared() < 1.0e-12f)
-        m_parameters.sunDirection = QVector3D(0.0f, 0.0f, 1.0f);
+	if (m_parameters.sunDirection.lengthSquared() < 1.0e-12f)
+		m_parameters.sunDirection = QVector3D(0.0f, 0.0f, 1.0f);
 
-    m_parameters.sunDirection.normalize();
-    m_parameters.weather.intensity =
-        clamp(m_parameters.weather.intensity, 0.0, 1.0);
-    m_parameters.weather.fogDensity =
-        clamp(m_parameters.weather.fogDensity, 0.0, 1.0);
+	m_parameters.sunDirection.normalize();
+	m_parameters.weather.intensity = clamp(m_parameters.weather.intensity, 0.0, 1.0);
+	m_parameters.weather.fogDensity = clamp(m_parameters.weather.fogDensity, 0.0, 1.0);
 
-    if (m_parameters.animateWeather && weatherNeedsAnimation()) {
-        if (!m_weatherTimer->isActive())
-            m_weatherTimer->start();
-    } else {
-        m_weatherTimer->stop();
-    }
+	if (m_parameters.animateWeather && weatherNeedsAnimation()) {
+		if (!m_weatherTimer->isActive())
+			m_weatherTimer->start();
+	}
+	else {
+		m_weatherTimer->stop();
+	}
 
-    rebuildPreview();
-    update();
+	rebuildPreview();
+	update();
 }
 
 const SkyPerspectiveParameters&
@@ -347,64 +338,66 @@ bool SkyPerspectiveWidget::weatherNeedsAnimation() const
 }
 
 QVector3D SkyPerspectiveWidget::cameraRay(
-    int x,
-    int y,
-    int width,
-    int height) const
+	int x,
+	int y,
+	int width,
+	int height) const
 {
-    const double yaw =
-        m_parameters.cameraAzimuthDeg * kDegToRad;
-    const double pitch =
-        m_parameters.cameraPitchDeg * kDegToRad;
+	const double yaw =
+		m_parameters.cameraAzimuthDeg * kDegToRad;
+	const double pitch =
+		m_parameters.cameraPitchDeg * kDegToRad;
 
-    // ENU coordinates:
-    // +X East, +Y North, +Z Zenith.
-    const QVector3D forward(
-        static_cast<float>(
-            std::cos(pitch) * std::sin(yaw)),
-        static_cast<float>(
-            std::cos(pitch) * std::cos(yaw)),
-        static_cast<float>(std::sin(pitch)));
+	// ENU coordinates:
+	// +X East, +Y North, +Z Zenith.
+	const QVector3D forward(static_cast<float>(std::cos(pitch) * std::sin(yaw)), static_cast<float>(std::cos(pitch) * std::cos(yaw)), static_cast<float>(std::sin(pitch)));
 
-    QVector3D right =
-        QVector3D::crossProduct(
-            forward,
-            QVector3D(0.0f, 0.0f, 1.0f));
+	QVector3D right = QVector3D::crossProduct(forward, QVector3D(0.0f, 0.0f, 1.0f));
 
-    if (right.lengthSquared() < 1.0e-10f)
-        right = QVector3D(1.0f, 0.0f, 0.0f);
-    else
-        right.normalize();
+	if (right.lengthSquared() < 1.0e-10f)
+		right = QVector3D(1.0f, 0.0f, 0.0f);
+	else
+		right.normalize();
 
-    const QVector3D up =
-        QVector3D::crossProduct(
-            right,
-            forward).normalized();
+	const QVector3D up = QVector3D::crossProduct(right, forward).normalized();
 
-    const double aspect =
-        static_cast<double>(width)
-        / std::max(1, height);
+	const double roll = m_parameters.cameraRollDeg * kDegToRad;
+	const double c = std::cos(roll);
+	const double sr = std::sin(roll);
+	const QVector3D rolledRight = static_cast<float>(c) * right + static_cast<float>(sr) * up;
+	const QVector3D rolledUp = static_cast<float>(-sr) * right + static_cast<float>(c) * up;
 
-    const double tanHalfFov =
-        std::tan(
-            0.5
-            * m_parameters.verticalFovDeg
-            * kDegToRad);
+	//const double aspect =
+	//    static_cast<double>(width)
+	//    / std::max(1, height);
 
-    const double screenX =
-        (2.0 * (x + 0.5) / width - 1.0)
-        * aspect
-        * tanHalfFov;
+	const double tanHalfH = std::tan(0.5* m_parameters.horizontalFovDeg* kDegToRad);
+	const double tanHalfV = std::tan(0.5* m_parameters.verticalFovDeg* kDegToRad);
 
-    const double screenY =
-        (1.0 - 2.0 * (y + 0.5) / height)
-        * tanHalfFov;
+	const double screenX = (2.0 * (x + 0.5) / width - 1.0)* tanHalfH;
 
-    return (
-        forward
-        + static_cast<float>(screenX) * right
-        + static_cast<float>(screenY) * up
-    ).normalized();
+	const double screenY = (1.0 - 2.0 * (y + 0.5) / height)* tanHalfV;
+	//const double tanHalfFov =
+	//    std::tan(
+	//        0.5
+	//        * m_parameters.verticalFovDeg
+	//        * kDegToRad);
+
+	//const double screenX =
+	//    (2.0 * (x + 0.5) / width - 1.0)
+	//    * aspect
+	//    * tanHalfFov;
+
+	//const double screenY =
+	//    (1.0 - 2.0 * (y + 0.5) / height)
+	//    * tanHalfFov;
+
+	//return (
+	//    forward
+	//    + static_cast<float>(screenX) * right
+	//    + static_cast<float>(screenY) * up
+	//).normalized();
+	return (forward + static_cast<float>(screenX) * rolledRight + static_cast<float>(screenY) * rolledUp).normalized();
 }
 
 QColor SkyPerspectiveWidget::falseColor(double value)
@@ -513,163 +506,155 @@ QColor SkyPerspectiveWidget::naturalPreviewColor(
 }
 
 QImage SkyPerspectiveWidget::renderBaseImage(
-    const QSize& imageSize) const
+	const QSize& imageSize) const
 {
-    const int width =
-        std::max(1, imageSize.width());
-    const int height =
-        std::max(1, imageSize.height());
+	const int width = std::max(1, imageSize.width());
+	const int height = std::max(1, imageSize.height());
 
-    QImage image(
-        width,
-        height,
-        QImage::Format_ARGB32);
+	QImage image(width, height, QImage::Format_ARGB32);
 
-    image.fill(QColor(28, 30, 34));
+	image.fill(QColor(28, 30, 34));
 
-    const double scale = absoluteScale();
+	const double scale = absoluteScale();
 
-    QVector<double> samples(
-        width * height,
-        0.0);
+	QVector<double> samples(width * height, 0.0);
 
-    double skyPeak = 0.0;
+	double skyPeak = 0.0;
 
-    for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x) {
-            const QVector3D direction =
-                cameraRay(
-                    x, y, width, height);
+	for (int y = 0; y < height; ++y) {
+		for (int x = 0; x < width; ++x) {
+			const QVector3D direction =
+				cameraRay(
+					x, y, width, height);
 
-            if (direction.z() <= 0.0f)
-                continue;
+			if (direction.z() <= 0.0f)
+				continue;
 
-            const double value =
-                relativeSkyValue(direction) * scale;
+			const double value =relativeSkyValue(direction) * scale;
 
-            samples[y * width + x] = value;
-            skyPeak = std::max(skyPeak, value);
-        }
-    }
+			samples[y * width + x] = value;
+			skyPeak = std::max(skyPeak, value);
+		}
+	}
 
-    const double referenceValue =
-        m_parameters.toneMapMode ==
-            SkyToneMapMode::AutoPeak
-        ? std::max(1.0e-9, skyPeak)
-        : std::max(
-            1.0e-9,
-            m_parameters.displayReferenceValue);
+	const double referenceValue =
+		m_parameters.toneMapMode ==
+		SkyToneMapMode::AutoPeak
+		? std::max(1.0e-9, skyPeak)
+		: std::max(
+			1.0e-9,
+			m_parameters.displayReferenceValue);
 
-    const QVector3D sun =
-        m_parameters.sunDirection.normalized();
+	const QVector3D sun =
+		m_parameters.sunDirection.normalized();
 
-    const double sunRadiusRadians =
-        m_parameters.sunAngularRadiusDeg
-        * kDegToRad;
+	const double sunRadiusRadians =
+		m_parameters.sunAngularRadiusDeg
+		* kDegToRad;
 
-    const double cosSunRadius =
-        std::cos(sunRadiusRadians);
+	const double cosSunRadius =
+		std::cos(sunRadiusRadians);
 
-    const double sunSolidAngle =
-        2.0 * kPi
-        * (1.0 - std::cos(sunRadiusRadians));
+	const double sunSolidAngle =
+		2.0 * kPi
+		* (1.0 - std::cos(sunRadiusRadians));
 
-    const double effectiveDirectNormal =
-        m_parameters.directNormalValue
-        * atmosphericAttenuation();
+	const double effectiveDirectNormal =
+		m_parameters.directNormalValue
+		* atmosphericAttenuation();
 
-    const double directDiskValue =
-        sunSolidAngle > 1.0e-12
-        ? effectiveDirectNormal / sunSolidAngle
-        : 0.0;
+	const double directDiskValue =
+		sunSolidAngle > 1.0e-12
+		? effectiveDirectNormal / sunSolidAngle
+		: 0.0;
 
-    const double directStrength =
-        clamp(
-            effectiveDirectNormal / 800.0,
-            0.0,
-            1.0);
+	const double directStrength =
+		clamp(
+			effectiveDirectNormal / 800.0,
+			0.0,
+			1.0);
 
-    for (int y = 0; y < height; ++y) {
-        QRgb* scanline =
-            reinterpret_cast<QRgb*>(
-                image.scanLine(y));
+	for (int y = 0; y < height; ++y) {
+		QRgb* scanline =
+			reinterpret_cast<QRgb*>(
+				image.scanLine(y));
 
-        for (int x = 0; x < width; ++x) {
-            const QVector3D direction =
-                cameraRay(
-                    x, y, width, height);
+		for (int x = 0; x < width; ++x) {
+			const QVector3D direction =
+				cameraRay(
+					x, y, width, height);
 
-            if (direction.z() <= 0.0f) {
-                scanline[x] = groundColor().rgba();
-                continue;
-            }
+			if (direction.z() <= 0.0f) {
+				scanline[x] = groundColor().rgba();
+				continue;
+			}
 
-            const double value =
-                samples[y * width + x];
+			const double value =
+				samples[y * width + x];
 
-            const double normalized =
-                toneMappedValue(
-                    value,
-                    referenceValue);
+			const double normalized =
+				toneMappedValue(
+					value,
+					referenceValue);
 
-            const double sunCosine =
-                QVector3D::dotProduct(
-                    direction,
-                    sun);
+			const double sunCosine =
+				QVector3D::dotProduct(
+					direction,
+					sun);
 
-            QColor color;
+			QColor color;
 
-            switch (m_parameters.colorMode) {
-            case SkyColorMode::FalseColor:
-                color = falseColor(normalized);
-                break;
+			switch (m_parameters.colorMode) {
+			case SkyColorMode::FalseColor:
+				color = falseColor(normalized);
+				break;
 
-            case SkyColorMode::NaturalPreview:
-                color = naturalPreviewColor(
-                    direction,
-                    normalized,
-                    sunCosine,
-                    directStrength);
-                break;
+			case SkyColorMode::NaturalPreview:
+				color = naturalPreviewColor(
+					direction,
+					normalized,
+					sunCosine,
+					directStrength);
+				break;
 
-            case SkyColorMode::GrayscaleLuminance:
-            default:
-                color = QColor::fromRgbF(
-                    normalized,
-                    normalized,
-                    normalized);
-                break;
-            }
+			case SkyColorMode::GrayscaleLuminance:
+			default:
+				color = QColor::fromRgbF(
+					normalized,
+					normalized,
+					normalized);
+				break;
+			}
 
-            color = applyWeatherAtmosphere(color);
+			color = applyWeatherAtmosphere(color);
 
-            if (m_parameters.showSunDisk &&
-                effectiveDirectNormal > 0.0 &&
-                sun.z() > 0.0f &&
-                sunCosine >= cosSunRadius) {
+			if (m_parameters.showSunDisk &&
+				effectiveDirectNormal > 0.0 &&
+				sun.z() > 0.0f &&
+				sunCosine >= cosSunRadius) {
 
-                const double sunNormalized =
-                    toneMappedValue(
-                        directDiskValue,
-                        referenceValue);
+				const double sunNormalized =
+					toneMappedValue(
+						directDiskValue,
+						referenceValue);
 
-                const double warm =
-                    clamp(
-                        0.75 + 0.25 * sunNormalized,
-                        0.0,
-                        1.0);
+				const double warm =
+					clamp(
+						0.75 + 0.25 * sunNormalized,
+						0.0,
+						1.0);
 
-                color = QColor::fromRgbF(
-                    warm,
-                    warm * 0.97,
-                    warm * 0.86);
-            }
+				color = QColor::fromRgbF(
+					warm,
+					warm * 0.97,
+					warm * 0.86);
+			}
 
-            scanline[x] = color.rgba();
-        }
-    }
+			scanline[x] = color.rgba();
+		}
+	}
 
-    return image;
+	return image;
 }
 
 void SkyPerspectiveWidget::drawWeatherOverlay(
@@ -833,11 +818,9 @@ void SkyPerspectiveWidget::rebuildPreview()
         return;
 
     // Keep mouse interaction responsive. Export can use any resolution.
-    const QSize previewSize =
-        size().boundedTo(QSize(800, 520));
+    const QSize previewSize =  size().boundedTo(QSize(800, 520));
 
-    m_preview =
-        renderBaseImage(previewSize);
+    m_preview = renderBaseImage(previewSize);
 }
 
 void SkyPerspectiveWidget::paintEvent(
@@ -1013,6 +996,8 @@ void SkyPerspectiveWidget::mouseMoveEvent(
     emit cameraChanged(
         m_parameters.cameraAzimuthDeg,
         m_parameters.cameraPitchDeg,
+		m_parameters.cameraRollDeg,
+		m_parameters.horizontalFovDeg,
         m_parameters.verticalFovDeg);
 }
 
@@ -1035,6 +1020,8 @@ void SkyPerspectiveWidget::wheelEvent(
     emit cameraChanged(
         m_parameters.cameraAzimuthDeg,
         m_parameters.cameraPitchDeg,
+		m_parameters.cameraRollDeg,
+		m_parameters.horizontalFovDeg,
         m_parameters.verticalFovDeg);
 
     event->accept();

@@ -48,6 +48,8 @@ struct SkyPerspectiveParameters {
     double cameraAzimuthDeg = 180.0;
     double cameraPitchDeg = 20.0;
     double verticalFovDeg = 90.0;
+	double cameraRollDeg = 0.0;
+	double horizontalFovDeg = 90.0;
 
     SkyColorMode colorMode = SkyColorMode::NaturalPreview;
     SkyToneMapMode toneMapMode = SkyToneMapMode::FixedReference;
@@ -86,6 +88,8 @@ signals:
     void cameraChanged(
         double azimuthDeg,
         double pitchDeg,
+		double rollDeg,
+		double horizontalFovDeg,
         double verticalFovDeg);
 
 protected:

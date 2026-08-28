@@ -82,6 +82,8 @@ private:
     QDoubleSpinBox* m_cameraAzimuthSpin = nullptr;
     QDoubleSpinBox* m_cameraAltitudeSpin = nullptr;
     QDoubleSpinBox* m_cameraFovSpin = nullptr;
+	QDoubleSpinBox* m_cameraRollSpin = nullptr;
+	QDoubleSpinBox* m_cameraHfovSpin = nullptr;
 
     QComboBox* m_scaleModeCombo = nullptr;
     QDoubleSpinBox* m_targetValueSpin = nullptr;

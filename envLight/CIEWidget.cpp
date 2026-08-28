@@ -76,16 +76,11 @@ QString skyTypeName(int type)
 CIEWidget::CIEWidget(QWidget* parent)
     : QMainWindow(parent)
 {
-    m_renderTimer =
-        new QTimer(this);
+    m_renderTimer =        new QTimer(this);
     m_renderTimer->setSingleShot(true);
     m_renderTimer->setInterval(60);
 
-    connect(
-        m_renderTimer,
-        &QTimer::timeout,
-        this,
-        &CIEWidget::onRenderTimeout);
+    connect(       m_renderTimer,        &QTimer::timeout,        this,        &CIEWidget::onRenderTimeout);
 
     setupUI();
 
@@ -100,55 +95,42 @@ CIEWidget::~CIEWidget() = default;
 
 void CIEWidget::setupUI()
 {
-	QWidget* central =
-		new QWidget(this);
+	QWidget* central = new QWidget(this);
 	setCentralWidget(central);
 
-	QHBoxLayout* centralLayout =
-		new QHBoxLayout(central);
+	QHBoxLayout* centralLayout = new QHBoxLayout(central);
 
-	QSplitter* splitter =
-		new QSplitter(Qt::Horizontal, central);
+	QSplitter* splitter = new QSplitter(Qt::Horizontal, central);
 
 	centralLayout->addWidget(splitter);
 
 	// ---------------- Left parameter panel ----------------
-	QScrollArea* parameterScroll =
-		new QScrollArea(splitter);
+	QScrollArea* parameterScroll = new QScrollArea(splitter);
 	parameterScroll->setWidgetResizable(true);
 	parameterScroll->setMinimumWidth(330);
 
-	QWidget* parameterPanel =
-		new QWidget;
-	QVBoxLayout* parameterLayout =
-		new QVBoxLayout(parameterPanel);
+	QWidget* parameterPanel = new QWidget;
+	QVBoxLayout* parameterLayout = new QVBoxLayout(parameterPanel);
 
 	// Sky type.
-	QGroupBox* skyGroup =
-		new QGroupBox(tr("CIE 天空类型"));
+	QGroupBox* skyGroup = new QGroupBox(tr("CIE 天空类型"));
 
-	QVBoxLayout* skyLayout =
-		new QVBoxLayout(skyGroup);
+	QVBoxLayout* skyLayout = new QVBoxLayout(skyGroup);
 
-	m_skyTypeCombo =
-		new QComboBox;
+	m_skyTypeCombo = new QComboBox;
 
-	for (int type = 1; type <= 15; ++type) {
-		m_skyTypeCombo->addItem(
-			QString("%1. %2")
-			.arg(type, 2, 10, QChar('0'))
-			.arg(skyTypeName(type)));
+	for (int type = 1; type <= 15; ++type)
+	{
+		m_skyTypeCombo->addItem(QString("%1. %2").arg(type, 2, 10, QChar('0')).arg(skyTypeName(type)));
 	}
 
 	skyLayout->addWidget(m_skyTypeCombo);
 	parameterLayout->addWidget(skyGroup);
 
 	// A-E coefficients.
-	QGroupBox* coefficientGroup =
-		new QGroupBox(tr("CIE 参数 A-E"));
+	QGroupBox* coefficientGroup = new QGroupBox(tr("CIE 参数 A-E"));
 
-	QGridLayout* coefficientLayout =
-		new QGridLayout(coefficientGroup);
+	QGridLayout* coefficientLayout = new QGridLayout(coefficientGroup);
 
 	auto addCoefficientSpin =
 		[&](const QString& name,
@@ -164,19 +146,13 @@ void CIEWidget::setupUI()
 					row,
 					0);
 
-				spin =
-					new QDoubleSpinBox;
+				spin = new QDoubleSpinBox;
 
-				spin->setRange(
-					minimum,
-					maximum);
+				spin->setRange(minimum, maximum);
 				spin->setDecimals(3);
 				spin->setSingleStep(0.05);
 
-				coefficientLayout->addWidget(
-					spin,
-					row,
-					1);
+				coefficientLayout->addWidget(spin, row, 1);
 	};
 
 	addCoefficientSpin("A", m_spinA, -5.0, 5.0);
@@ -185,8 +161,7 @@ void CIEWidget::setupUI()
 	addCoefficientSpin("D", m_spinD, -10.0, 5.0);
 	addCoefficientSpin("E", m_spinE, -5.0, 5.0);
 
-	parameterLayout->addWidget(
-		coefficientGroup);
+	parameterLayout->addWidget(coefficientGroup);
 
 	// EPW controls.
 	QGroupBox* epwGroup = new QGroupBox(tr("EPW 时间与地点"));
@@ -213,53 +188,61 @@ void CIEWidget::setupUI()
 
 	// Absolute scale.
 	QGroupBox* scaleGroup = new QGroupBox(tr("绝对量标定"));
-
 	QFormLayout* scaleLayout = new QFormLayout(scaleGroup);
-
 	m_scaleModeCombo = new QComboBox;
-
 	m_scaleModeCombo->addItem(tr("EPW 水平散射辐照度"), static_cast<int>(SkyAbsoluteScaleMode::DiffuseHorizontalIrradiance));
-
 	m_scaleModeCombo->addItem(tr("EPW 水平散射照度"), static_cast<int>(SkyAbsoluteScaleMode::DiffuseHorizontalIlluminance));
-
 	m_scaleModeCombo->addItem(tr("EPW 天顶亮度"), static_cast<int>(SkyAbsoluteScaleMode::ZenithLuminance));
 
 	m_targetValueSpin = new QDoubleSpinBox;
 	m_targetValueSpin->setRange(0.0, 100000000.0);
 	m_targetValueSpin->setDecimals(3);
 
-	m_directNormalSpin = new QDoubleSpinBox;    m_directNormalSpin->setRange(0.0, 100000000.0);
+	m_directNormalSpin = new QDoubleSpinBox;
+	m_directNormalSpin->setRange(0.0, 100000000.0);
 	m_directNormalSpin->setDecimals(3);
 
 	m_scaleUnitLabel = new QLabel("W/m²");
 
-	scaleLayout->addRow(tr("标定方式"), m_scaleModeCombo);    scaleLayout->addRow(
-		tr("散射天空目标值"), m_targetValueSpin);
-	scaleLayout->addRow(tr("太阳直射法向值"),
-		m_directNormalSpin);    scaleLayout->addRow(tr("当前单位"), m_scaleUnitLabel);
+	scaleLayout->addRow(tr("标定方式"), m_scaleModeCombo);
+	scaleLayout->addRow(tr("散射天空目标值"), m_targetValueSpin);
+	scaleLayout->addRow(tr("太阳直射法向值"), m_directNormalSpin);
+	scaleLayout->addRow(tr("当前单位"), m_scaleUnitLabel);
 
 	parameterLayout->addWidget(scaleGroup);
-
 	// Camera.
 	QGroupBox* cameraGroup = new QGroupBox(tr("透视相机"));
 
 	QFormLayout* cameraLayout = new QFormLayout(cameraGroup);
 
-	m_cameraAzimuthSpin = new QDoubleSpinBox;    m_cameraAzimuthSpin->setRange(0.0, 359.9);
+	m_cameraAzimuthSpin = new QDoubleSpinBox;
+	m_cameraAzimuthSpin->setRange(0.0, 359.9);
 	m_cameraAzimuthSpin->setDecimals(1);
 	m_cameraAzimuthSpin->setSingleStep(5.0);
 	m_cameraAzimuthSpin->setSuffix("°");
 	m_cameraAzimuthSpin->setValue(180.0);
 
-	m_cameraAltitudeSpin =
-		new QDoubleSpinBox;
-	m_cameraAltitudeSpin->setRange(
-		-89.0,
-		89.0);
+	m_cameraAltitudeSpin = new QDoubleSpinBox;
+	m_cameraAltitudeSpin->setRange(-89.0, 89.0);
 	m_cameraAltitudeSpin->setDecimals(1);
 	m_cameraAltitudeSpin->setSingleStep(5.0);
 	m_cameraAltitudeSpin->setSuffix("°");
 	m_cameraAltitudeSpin->setValue(20.0);
+
+	m_cameraRollSpin = new QDoubleSpinBox;
+	m_cameraRollSpin->setRange(-180.0, 180.0);
+	m_cameraRollSpin->setDecimals(1);
+	m_cameraRollSpin->setSingleStep(1.0);
+	m_cameraRollSpin->setSuffix("°");
+	m_cameraRollSpin->setValue(0.0);
+	m_cameraRollSpin->setToolTip(tr("沿观察方向看，正 Roll 为顺时针旋转"));
+
+	m_cameraHfovSpin = new QDoubleSpinBox;
+	m_cameraHfovSpin->setRange(10.0, 170.0);
+	m_cameraHfovSpin->setDecimals(1);
+	m_cameraHfovSpin->setSingleStep(1.0);
+	m_cameraHfovSpin->setSuffix("°");
+	m_cameraHfovSpin->setValue(90.0);
 
 	m_cameraFovSpin = new QDoubleSpinBox;
 	m_cameraFovSpin->setRange(10.0, 170.0);
@@ -272,17 +255,17 @@ void CIEWidget::setupUI()
 
 	cameraLayout->addRow(tr("观察方位 Az"), m_cameraAzimuthSpin);
 	cameraLayout->addRow(tr("观察仰角 Alt"), m_cameraAltitudeSpin);
+	cameraLayout->addRow(tr("横滚 Roll"), m_cameraRollSpin);
+	cameraLayout->addRow(tr("水平视场 HFOV"), m_cameraHfovSpin);
 	cameraLayout->addRow(tr("垂直视场 VFOV"), m_cameraFovSpin);
 	cameraLayout->addRow(m_resetCameraButton);
 
 	parameterLayout->addWidget(cameraGroup);
 
 	// EPW weather visual effects.
-	QGroupBox* weatherGroup =
-		new QGroupBox(tr("雨雪与能见度效果"));
+	QGroupBox* weatherGroup = new QGroupBox(tr("雨雪与能见度效果"));
 
-	QFormLayout* weatherLayout =
-		new QFormLayout(weatherGroup);
+	QFormLayout* weatherLayout = new QFormLayout(weatherGroup);
 
 	m_weatherModeCombo = new QComboBox;
 	m_weatherModeCombo->addItem(tr("自动读取 EPW"), -1);
@@ -301,16 +284,13 @@ void CIEWidget::setupUI()
 	m_weatherIntensitySpin->setValue(0.6);
 	m_weatherIntensitySpin->setEnabled(false);
 
-	m_animateWeatherCheck =
-		new QCheckBox(tr("播放雨雪动画"));
+	m_animateWeatherCheck = new QCheckBox(tr("播放雨雪动画"));
 	m_animateWeatherCheck->setChecked(true);
 
-	m_showWeatherParticlesCheck =
-		new QCheckBox(tr("显示雨丝/雪花粒子"));
+	m_showWeatherParticlesCheck = new QCheckBox(tr("显示雨丝/雪花粒子"));
 	m_showWeatherParticlesCheck->setChecked(true);
 
-	m_showWeatherGroundCheck =
-		new QCheckBox(tr("显示湿地面/积雪地面"));
+	m_showWeatherGroundCheck = new QCheckBox(tr("显示湿地面/积雪地面"));
 	m_showWeatherGroundCheck->setChecked(true);
 
 	m_weatherStatusLabel = new QLabel(tr("当前：无 EPW 天气数据"));
@@ -342,7 +322,8 @@ void CIEWidget::setupUI()
 
 	m_toneMapCombo->addItem(tr("每帧自动峰值"), static_cast<int>(SkyToneMapMode::AutoPeak));
 
-	m_referenceValueSpin = new QDoubleSpinBox;    m_referenceValueSpin->setRange(0.001, 100000000.0);
+	m_referenceValueSpin = new QDoubleSpinBox;
+	m_referenceValueSpin->setRange(0.001, 100000000.0);
 	m_referenceValueSpin->setDecimals(3);
 	m_referenceValueSpin->setValue(50.0);
 
@@ -369,10 +350,14 @@ void CIEWidget::setupUI()
 
 	m_exportButton = new QPushButton(tr("导出 1920×1080 PNG"));
 
-	displayLayout->addRow(tr("颜色模式"), m_colorModeCombo);    displayLayout->addRow(tr("色调映射"), m_toneMapCombo);
+	displayLayout->addRow(tr("颜色模式"), m_colorModeCombo);
+	displayLayout->addRow(tr("色调映射"), m_toneMapCombo);
 	displayLayout->addRow(tr("显示参考值"), m_referenceValueSpin);
-	displayLayout->addRow(tr("曝光"), m_exposureSpin);    displayLayout->addRow(tr("Gamma"), m_gammaSpin);
-	displayLayout->addRow(m_showSunDiskCheck);    displayLayout->addRow(m_showSunGlowCheck);    displayLayout->addRow(m_showHorizonCheck);
+	displayLayout->addRow(tr("曝光"), m_exposureSpin);
+	displayLayout->addRow(tr("Gamma"), m_gammaSpin);
+	displayLayout->addRow(m_showSunDiskCheck);
+	displayLayout->addRow(m_showSunGlowCheck);
+	displayLayout->addRow(m_showHorizonCheck);
 	displayLayout->addRow(m_exportButton);
 
 	parameterLayout->addWidget(displayGroup);
@@ -399,9 +384,7 @@ void CIEWidget::setupUI()
 
 	// ---------------- Connections ----------------
 	connect(m_loadEpwButton, &QPushButton::clicked, this, &CIEWidget::onLoadEPW);
-
 	connect(m_timeSlider, &QSlider::valueChanged, this, &CIEWidget::onSliderTime);
-
 	connect(m_skyTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &CIEWidget::onSkyTypeChanged);
 
 	auto connectCoefficient = [this](QDoubleSpinBox* spin) {
@@ -437,6 +420,8 @@ void CIEWidget::setupUI()
 	connectPerspectiveSpin(m_cameraAzimuthSpin);
 	connectPerspectiveSpin(m_cameraAltitudeSpin);
 	connectPerspectiveSpin(m_cameraFovSpin);
+	connectPerspectiveSpin(m_cameraRollSpin);
+	connectPerspectiveSpin(m_cameraHfovSpin);
 	connectPerspectiveSpin(m_targetValueSpin);
 	connectPerspectiveSpin(m_directNormalSpin);
 	connectPerspectiveSpin(m_referenceValueSpin);
@@ -454,101 +439,77 @@ void CIEWidget::setupUI()
 			});
 	};
 
-	connectPerspectiveCombo(
-		m_colorModeCombo);
-	connectPerspectiveCombo(
-		m_toneMapCombo);
+	connectPerspectiveCombo(m_colorModeCombo);
+	connectPerspectiveCombo(m_toneMapCombo);
 
 	connect(m_showSunDiskCheck, &QCheckBox::toggled, this, [this](bool) {			onPerspectiveControlsChanged();		});
-
 	connect(m_showSunGlowCheck, &QCheckBox::toggled, this, [this](bool) {			onPerspectiveControlsChanged();		});
-
 	connect(m_showHorizonCheck, &QCheckBox::toggled, this, [this](bool) {			onPerspectiveControlsChanged();		});
 
 	connect(m_weatherModeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &CIEWidget::onWeatherModeChanged);
 	connect(m_weatherIntensitySpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double) { onPerspectiveControlsChanged(); });
-
 	connect(m_animateWeatherCheck, &QCheckBox::toggled, this, [this](bool) { onPerspectiveControlsChanged(); });
-
 	connect(m_showWeatherParticlesCheck, &QCheckBox::toggled, this, [this](bool) { onPerspectiveControlsChanged(); });
-
 	connect(m_showWeatherGroundCheck, &QCheckBox::toggled, this, [this](bool) { onPerspectiveControlsChanged(); });
-
 	connect(m_resetCameraButton, &QPushButton::clicked, this, &CIEWidget::onResetCamera);
-
 	connect(m_exportButton, &QPushButton::clicked, this, &CIEWidget::onExportPerspective);
-
 	connect(m_perspectiveWidget, &SkyPerspectiveWidget::cameraChanged, this, [this](
 		double azimuth,
 		double altitude,
+		double roll,
+		double hfov,
 		double vfov) {
+			const QSignalBlocker blockAzimuth(m_cameraAzimuthSpin);
+			const QSignalBlocker blockAltitude(m_cameraAltitudeSpin);
+			const QSignalBlocker blockFov(m_cameraFovSpin);
+			const QSignalBlocker blockRoll(m_cameraRollSpin);
+			const QSignalBlocker blockHfov(m_cameraHfovSpin);
 
-			const QSignalBlocker blockAzimuth(
-				m_cameraAzimuthSpin);
-			const QSignalBlocker blockAltitude(
-				m_cameraAltitudeSpin);
-			const QSignalBlocker blockFov(
-				m_cameraFovSpin);
-
-			m_cameraAzimuthSpin->setValue(
-				azimuth);
-			m_cameraAltitudeSpin->setValue(
-				altitude);
-			m_cameraFovSpin->setValue(
-				vfov);
+			m_cameraRollSpin->setValue(roll);
+			m_cameraHfovSpin->setValue(hfov);
+			m_cameraAzimuthSpin->setValue(azimuth);
+			m_cameraAltitudeSpin->setValue(altitude);
+			m_cameraFovSpin->setValue(vfov);
 		});
 }
 
-void CIEWidget::onSkyTypeChanged(
-    int index)
+void CIEWidget::onSkyTypeChanged(int index)
 {
-    const SSLib::CIESkyCoefficients coefficients =
-        SSLib::CIEStandardSkyCoefficients(index);
+	const SSLib::CIESkyCoefficients coefficients = SSLib::CIEStandardSkyCoefficients(index);
 
-    const QSignalBlocker blockA(m_spinA);
-    const QSignalBlocker blockB(m_spinB);
-    const QSignalBlocker blockC(m_spinC);
-    const QSignalBlocker blockD(m_spinD);
-    const QSignalBlocker blockE(m_spinE);
+	const QSignalBlocker blockA(m_spinA);
+	const QSignalBlocker blockB(m_spinB);
+	const QSignalBlocker blockC(m_spinC);
+	const QSignalBlocker blockD(m_spinD);
+	const QSignalBlocker blockE(m_spinE);
 
-    m_spinA->setValue(coefficients.a);
-    m_spinB->setValue(coefficients.b);
-    m_spinC->setValue(coefficients.c);
-    m_spinD->setValue(coefficients.d);
-    m_spinE->setValue(coefficients.e);
+	m_spinA->setValue(coefficients.a);
+	m_spinB->setValue(coefficients.b);
+	m_spinC->setValue(coefficients.c);
+	m_spinD->setValue(coefficients.d);
+	m_spinE->setValue(coefficients.e);
 
-    m_customCoefficients = false;
+	m_customCoefficients = false;
 
-    m_skyWidget->setCieSkyType(index);
-    updatePerspectiveView();
+	m_skyWidget->setCieSkyType(index);
+	updatePerspectiveView();
 }
 
 void CIEWidget::onCoefficientChanged()
 {
-    SSLib::CIESkyCoefficients coefficients;
+	SSLib::CIESkyCoefficients coefficients;
 
-    coefficients.a =
-        static_cast<float>(
-            m_spinA->value());
-    coefficients.b =
-        static_cast<float>(
-            m_spinB->value());
-    coefficients.c =
-        static_cast<float>(
-            m_spinC->value());
-    coefficients.d =
-        static_cast<float>(
-            m_spinD->value());
-    coefficients.e =
-        static_cast<float>(
-            m_spinE->value());
+	coefficients.a = static_cast<float>(m_spinA->value());
+	coefficients.b = static_cast<float>(m_spinB->value());
+	coefficients.c = static_cast<float>(m_spinC->value());
+	coefficients.d = static_cast<float>(m_spinD->value());
+	coefficients.e = static_cast<float>(m_spinE->value());
 
-    m_customCoefficients = true;
+	m_customCoefficients = true;
 
-    m_skyWidget->setCustomCoefficients(
-        coefficients);
+	m_skyWidget->setCustomCoefficients(coefficients);
 
-    updatePerspectiveView();
+	updatePerspectiveView();
 }
 
 void CIEWidget::onRenderTimeout()
@@ -558,329 +519,221 @@ void CIEWidget::onRenderTimeout()
 
 void CIEWidget::onLoadEPW()
 {
-    const QString path =
-        QFileDialog::getOpenFileName(
-            this,
-            tr("打开 EPW 文件"),
-            QString(),
-            tr("EPW 文件 (*.epw)"));
+	const QString path = QFileDialog::getOpenFileName(this, tr("打开 EPW 文件"), QString(), tr("EPW 文件 (*.epw)"));
 
-    if (path.isEmpty())
-        return;
+	if (path.isEmpty())
+		return;
 
-    EpwDocument document;
+	EpwDocument document;
 
-    if (!EpwReader::read(
-            path,
-            document)) {
+	if (!EpwReader::read(path, document)) {
 
-        QMessageBox::critical(
-            this,
-            tr("EPW 错误"),
-            tr("EPW 文件解析失败。"));
+		QMessageBox::critical(this, tr("EPW 错误"), tr("EPW 文件解析失败。"));
+		return;
+	}
 
-        return;
-    }
+	m_epwDocument = document;
+	m_epwLoaded = true;
 
-    m_epwDocument = document;
-    m_epwLoaded = true;
+	m_latitude = document.location.latitude;
+	m_longitude = document.location.longitude;
+	m_timeZone = document.location.timeZone;
 
-    m_latitude =
-        document.location.latitude;
-    m_longitude =
-        document.location.longitude;
-    m_timeZone =
-        document.location.timeZone;
+	m_skyWidget->setLocation(m_latitude, m_longitude, m_timeZone);
 
-    m_skyWidget->setLocation(
-        m_latitude,
-        m_longitude,
-        m_timeZone);
+	m_locationInfo->setText(
+		QString(
+			"%1  纬度 %2°  经度 %3°  UTC%4")
+		.arg(document.location.city)
+		.arg(m_latitude, 0, 'f', 4)
+		.arg(m_longitude, 0, 'f', 4)
+		.arg(
+			m_timeZone >= 0.0
+			? QString("+%1")
+			.arg(m_timeZone)
+			: QString::number(
+				m_timeZone)));
 
-    m_locationInfo->setText(
-        QString(
-            "%1  纬度 %2°  经度 %3°  UTC%4")
-            .arg(document.location.city)
-            .arg(m_latitude, 0, 'f', 4)
-            .arg(m_longitude, 0, 'f', 4)
-            .arg(
-                m_timeZone >= 0.0
-                    ? QString("+%1")
-                        .arg(m_timeZone)
-                    : QString::number(
-                        m_timeZone)));
+	if (document.records.isEmpty())
+	{
+		m_timeSlider->setRange(0, 0);
+		m_timeSlider->setEnabled(false);
+		m_sliderInfo->setText(tr("EPW 无有效数据"));
+		return;
+	}
 
-    if (document.records.isEmpty()) {
-        m_timeSlider->setRange(0, 0);
-        m_timeSlider->setEnabled(false);
-        m_sliderInfo->setText(
-            tr("EPW 无有效数据"));
-        return;
-    }
+	m_timeSlider->setRange(0, document.records.size() - 1);
+	m_timeSlider->setEnabled(true);
+	m_timeSlider->setValue(0);
 
-    m_timeSlider->setRange(
-        0,
-        document.records.size() - 1);
-    m_timeSlider->setEnabled(true);
-    m_timeSlider->setValue(0);
-
-    applyEpwRecord(
-        document,
-        document.records.first());
+	applyEpwRecord(document, document.records.first());
 }
 
 void CIEWidget::onSliderTime(
     int value)
 {
-    if (!m_epwLoaded ||
-        value < 0 ||
+    if (!m_epwLoaded ||        value < 0 ||
         value >= m_epwDocument.records.size()) {
         return;
     }
 
-    const EpwRecord& record =
-        m_epwDocument.records[value];
+    const EpwRecord& record =        m_epwDocument.records[value];
 
-    applyEpwRecord(
-        m_epwDocument,
-        record);
+    applyEpwRecord(        m_epwDocument,        record);
 }
 
-void CIEWidget::applyEpwRecord(
-    const EpwDocument& document,
-    const EpwRecord& record)
+void CIEWidget::applyEpwRecord(const EpwDocument& document, const EpwRecord& record)
 {
-    const double midpoint =
-        epwMidpointHour(
-            record.hour,
-            record.minute,
-            document.recordsPerHour);
+	const double midpoint = epwMidpointHour(
+		record.hour,
+		record.minute,
+		document.recordsPerHour);
 
-    const double radiationFactor =
-        std::max(
-            1,
-            document.recordsPerHour);
+	const double radiationFactor = std::max(1, document.recordsPerHour);
 
-    m_currentDhi =
-        validNonNegative(record.dhi)
-        ? record.dhi * radiationFactor
-        : 0.0;
+	m_currentDhi = validNonNegative(record.dhi) ? record.dhi * radiationFactor : 0.0;
 
-    m_currentDni =
-        validNonNegative(record.dni)
-        ? record.dni * radiationFactor
-        : 0.0;
+	m_currentDni = validNonNegative(record.dni) ? record.dni * radiationFactor : 0.0;
 
-    m_currentDiffuseIlluminance =
-        validNonNegative(
-            record.diffuseHorizontalIlluminance)
-        ? record.diffuseHorizontalIlluminance
-        : 0.0;
+	m_currentDiffuseIlluminance = validNonNegative(record.diffuseHorizontalIlluminance) ? record.diffuseHorizontalIlluminance : 0.0;
 
-    m_currentDirectIlluminance =
-        validNonNegative(
-            record.directNormalIlluminance)
-        ? record.directNormalIlluminance
-        : 0.0;
+	m_currentDirectIlluminance = validNonNegative(record.directNormalIlluminance) ? record.directNormalIlluminance : 0.0;
 
-    m_currentZenithLuminance =
-        validNonNegative(
-            record.zenithLuminance)
-        ? record.zenithLuminance
-        : 0.0;
+	m_currentZenithLuminance = validNonNegative(record.zenithLuminance) ? record.zenithLuminance : 0.0;
 
-    m_currentWeather = deriveWeatherVisualState(
-        record,
-        document.recordsPerHour);
+	m_currentWeather = deriveWeatherVisualState(record, document.recordsPerHour);
 
-    m_currentDate =
-        QDate(
-            record.year,
-            record.month,
-            record.day);
+	m_currentDate = QDate(record.year, record.month, record.day);
 
-    m_currentDecimalHour = midpoint;
+	m_currentDecimalHour = midpoint;
 
-    m_skyWidget->setDateTime(
-        m_currentDate,
-        m_currentDecimalHour);
+	m_skyWidget->setDateTime(m_currentDate, m_currentDecimalHour);
 
-    m_skyWidget
-        ->setDiffuseHorizontalIrradiance(
-            m_currentDhi);
+	m_skyWidget->setDiffuseHorizontalIrradiance(m_currentDhi);
 
-    m_sliderInfo->setText(
-        QString(
-            "%1-%2-%3 %4:%5  中点 %6 h")
-            .arg(record.year)
-            .arg(
-                record.month,
-                2,
-                10,
-                QChar('0'))
-            .arg(
-                record.day,
-                2,
-                10,
-                QChar('0'))
-            .arg(
-                record.hour,
-                2,
-                10,
-                QChar('0'))
-            .arg(
-                record.minute,
-                2,
-                10,
-                QChar('0'))
-            .arg(
-                midpoint,
-                0,
-                'f',
-                2));
+	m_sliderInfo->setText(
+		QString(
+			"%1-%2-%3 %4:%5  中点 %6 h")
+		.arg(record.year)
+		.arg(
+			record.month,
+			2,
+			10,
+			QChar('0'))
+		.arg(
+			record.day,
+			2,
+			10,
+			QChar('0'))
+		.arg(
+			record.hour,
+			2,
+			10,
+			QChar('0'))
+		.arg(
+			record.minute,
+			2,
+			10,
+			QChar('0'))
+		.arg(
+			midpoint,
+			0,
+			'f',
+			2));
 
-    updateScaleInputsFromCurrentRecord();
-    updateWeatherInputsFromCurrentRecord();
-    updatePerspectiveView();
+	updateScaleInputsFromCurrentRecord();
+	updateWeatherInputsFromCurrentRecord();
+	updatePerspectiveView();
 }
 
 double CIEWidget::epwMidpointHour(
-    int hour,
-    int minute,
-    int recordsPerHour) const
+	int hour,
+	int minute,
+	int recordsPerHour) const
 {
-    const double intervalHours =
-        1.0 / std::max(
-            1,
-            recordsPerHour);
+	const double intervalHours = 1.0 / std::max(1, recordsPerHour);
 
-    const double endHour =
-        static_cast<double>(hour - 1)
-        + static_cast<double>(minute)
-            / 60.0;
+	const double endHour = static_cast<double>(hour - 1) + static_cast<double>(minute) / 60.0;
 
-    return endHour
-        - intervalHours * 0.5;
+	return endHour - intervalHours * 0.5;
 }
 
 QVector3D CIEWidget::currentSunDirection() const
 {
-    const SSLib::Vec3f sun =
-        SSLib::SunDirection(
-            static_cast<float>(
-                m_currentDecimalHour),
-            static_cast<float>(
-                m_timeZone),
-            m_currentDate.dayOfYear(),
-            static_cast<float>(
-                m_latitude),
-            static_cast<float>(
-                m_longitude));
+	const SSLib::Vec3f sun =
+		SSLib::SunDirection(
+			static_cast<float>(
+				m_currentDecimalHour),
+			static_cast<float>(
+				m_timeZone),
+			m_currentDate.dayOfYear(),
+			static_cast<float>(
+				m_latitude),
+			static_cast<float>(
+				m_longitude));
 
-    QVector3D direction(
-        sun[0],
-        sun[1],
-        sun[2]);
+	QVector3D direction(
+		sun[0],
+		sun[1],
+		sun[2]);
 
-    if (direction.lengthSquared()
-        < 1.0e-12f) {
-        return QVector3D(
-            0.0f,
-            0.0f,
-            1.0f);
-    }
+	if (direction.lengthSquared() < 1.0e-12f) {
+		return QVector3D(0.0f, 0.0f, 1.0f);
+	}
 
-    return direction.normalized();
+	return direction.normalized();
 }
 
-SkyPerspectiveParameters
-CIEWidget::currentPerspectiveParameters() const
+SkyPerspectiveParameters CIEWidget::currentPerspectiveParameters() const
 {
-    SkyPerspectiveParameters parameters;
+	SkyPerspectiveParameters parameters;
 
-    parameters.cieSkyType =
-        m_skyTypeCombo->currentIndex();
+	parameters.cieSkyType = m_skyTypeCombo->currentIndex();
 
-    parameters.customCoefficients =
-        m_customCoefficients;
+	parameters.customCoefficients = m_customCoefficients;
 
-    parameters.coefficients.a =
-        static_cast<float>(
-            m_spinA->value());
-    parameters.coefficients.b =
-        static_cast<float>(
-            m_spinB->value());
-    parameters.coefficients.c =
-        static_cast<float>(
-            m_spinC->value());
-    parameters.coefficients.d =
-        static_cast<float>(
-            m_spinD->value());
-    parameters.coefficients.e =
-        static_cast<float>(
-            m_spinE->value());
+	parameters.coefficients.a = static_cast<float>(m_spinA->value());
+	parameters.coefficients.b = static_cast<float>(m_spinB->value());
+	parameters.coefficients.c = static_cast<float>(m_spinC->value());
+	parameters.coefficients.d = static_cast<float>(m_spinD->value());
+	parameters.coefficients.e = static_cast<float>(m_spinE->value());
 
-    parameters.scaleMode =
-        static_cast<SkyAbsoluteScaleMode>(
-            m_scaleModeCombo
-                ->currentData()
-                .toInt());
+	parameters.scaleMode = static_cast<SkyAbsoluteScaleMode>(m_scaleModeCombo->currentData().toInt());
 
-    parameters.targetValue =
-        m_targetValueSpin->value();
+	parameters.targetValue = m_targetValueSpin->value();
 
-    parameters.directNormalValue =
-        m_directNormalSpin->value();
+	parameters.directNormalValue = m_directNormalSpin->value();
 
-    parameters.sunDirection =
-        currentSunDirection();
+	parameters.sunDirection = currentSunDirection();
 
-    parameters.cameraAzimuthDeg =
-        m_cameraAzimuthSpin->value();
-    parameters.cameraPitchDeg =
-        m_cameraAltitudeSpin->value();
-    parameters.verticalFovDeg =
-        m_cameraFovSpin->value();
+	parameters.cameraAzimuthDeg = m_cameraAzimuthSpin->value();
+	parameters.cameraPitchDeg = m_cameraAltitudeSpin->value();
+	parameters.verticalFovDeg = m_cameraFovSpin->value();
+	parameters.cameraRollDeg = m_cameraRollSpin->value();
+	parameters.horizontalFovDeg = m_cameraHfovSpin->value();
 
-    parameters.colorMode =
-        static_cast<SkyColorMode>(
-            m_colorModeCombo
-                ->currentData()
-                .toInt());
+	parameters.colorMode = static_cast<SkyColorMode>(m_colorModeCombo->currentData().toInt());
 
-    parameters.toneMapMode =
-        static_cast<SkyToneMapMode>(
-            m_toneMapCombo
-                ->currentData()
-                .toInt());
+	parameters.toneMapMode = static_cast<SkyToneMapMode>(m_toneMapCombo->currentData().toInt());
 
-    parameters.displayReferenceValue =
-        m_referenceValueSpin->value();
+	parameters.displayReferenceValue = m_referenceValueSpin->value();
 
-    parameters.exposure =
-        m_exposureSpin->value();
+	parameters.exposure = m_exposureSpin->value();
 
-    parameters.gamma =
-        m_gammaSpin->value();
+	parameters.gamma = m_gammaSpin->value();
 
-    parameters.showSunDisk =
-        m_showSunDiskCheck->isChecked();
+	parameters.showSunDisk = m_showSunDiskCheck->isChecked();
 
-    parameters.showSunGlow =
-        m_showSunGlowCheck->isChecked();
+	parameters.showSunGlow = m_showSunGlowCheck->isChecked();
 
-    parameters.showHorizon =
-        m_showHorizonCheck->isChecked();
+	parameters.showHorizon = m_showHorizonCheck->isChecked();
 
-    parameters.weather = selectedWeatherState();
-    parameters.animateWeather =
-        m_animateWeatherCheck->isChecked();
-    parameters.showWeatherParticles =
-        m_showWeatherParticlesCheck->isChecked();
-    parameters.showWeatherGround =
-        m_showWeatherGroundCheck->isChecked();
+	parameters.weather = selectedWeatherState();
+	parameters.animateWeather = m_animateWeatherCheck->isChecked();
+	parameters.showWeatherParticles = m_showWeatherParticlesCheck->isChecked();
+	parameters.showWeatherGround = m_showWeatherGroundCheck->isChecked();
 
-    return parameters;
+	return parameters;
 }
 
 void CIEWidget::updatePerspectiveView()
@@ -888,66 +741,43 @@ void CIEWidget::updatePerspectiveView()
     if (!m_perspectiveWidget)
         return;
 
-    m_perspectiveWidget->setParameters(
-        currentPerspectiveParameters());
+    m_perspectiveWidget->setParameters(currentPerspectiveParameters());
 }
 
 void CIEWidget::updateScaleInputsFromCurrentRecord()
 {
-    const SkyAbsoluteScaleMode mode =
-        static_cast<SkyAbsoluteScaleMode>(
-            m_scaleModeCombo
-                ->currentData()
-                .toInt());
+	const SkyAbsoluteScaleMode mode = static_cast<SkyAbsoluteScaleMode>(m_scaleModeCombo->currentData().toInt());
 
-    const QSignalBlocker targetBlocker(
-        m_targetValueSpin);
-    const QSignalBlocker directBlocker(
-        m_directNormalSpin);
-    const QSignalBlocker referenceBlocker(
-        m_referenceValueSpin);
+	const QSignalBlocker targetBlocker(m_targetValueSpin);
+	const QSignalBlocker directBlocker(m_directNormalSpin);
+	const QSignalBlocker referenceBlocker(m_referenceValueSpin);
 
-    switch (mode) {
-    case SkyAbsoluteScaleMode::
-        DiffuseHorizontalIlluminance:
+	switch (mode)
+	{
+	case SkyAbsoluteScaleMode::DiffuseHorizontalIlluminance:
+		m_targetValueSpin->setValue(m_currentDiffuseIlluminance);
+		m_directNormalSpin->setValue(m_currentDirectIlluminance);
+		m_referenceValueSpin->setValue(5000.0);
+		m_scaleUnitLabel->setText("lx / cd·m⁻²");
+		break;
 
-        m_targetValueSpin->setValue(
-            m_currentDiffuseIlluminance);
-        m_directNormalSpin->setValue(
-            m_currentDirectIlluminance);
-        m_referenceValueSpin->setValue(
-            5000.0);
-        m_scaleUnitLabel->setText(
-            "lx / cd·m⁻²");
-        break;
+	case SkyAbsoluteScaleMode::ZenithLuminance:
 
-    case SkyAbsoluteScaleMode::
-        ZenithLuminance:
+		m_targetValueSpin->setValue(m_currentZenithLuminance);
+		m_directNormalSpin->setValue(m_currentDirectIlluminance);
+		m_referenceValueSpin->setValue(5000.0);
+		m_scaleUnitLabel->setText("cd/m²；直射值为 lx");
+		break;
 
-        m_targetValueSpin->setValue(
-            m_currentZenithLuminance);
-        m_directNormalSpin->setValue(
-            m_currentDirectIlluminance);
-        m_referenceValueSpin->setValue(
-            5000.0);
-        m_scaleUnitLabel->setText(
-            "cd/m²；直射值为 lx");
-        break;
+	case SkyAbsoluteScaleMode::DiffuseHorizontalIrradiance:
+	default:
 
-    case SkyAbsoluteScaleMode::
-        DiffuseHorizontalIrradiance:
-    default:
-
-        m_targetValueSpin->setValue(
-            m_currentDhi);
-        m_directNormalSpin->setValue(
-            m_currentDni);
-        m_referenceValueSpin->setValue(
-            50.0);
-        m_scaleUnitLabel->setText(
-            "W/m²；天空像素为 W/(m²·sr)");
-        break;
-    }
+		m_targetValueSpin->setValue(m_currentDhi);
+		m_directNormalSpin->setValue(m_currentDni);
+		m_referenceValueSpin->setValue(50.0);
+		m_scaleUnitLabel->setText("W/m²；天空像素为 W/(m²·sr)");
+		break;
+	}
 }
 
 WeatherVisualState CIEWidget::selectedWeatherState() const
@@ -1035,6 +865,8 @@ void CIEWidget::onResetCamera()
 {
     m_cameraAzimuthSpin->setValue(180.0);
     m_cameraAltitudeSpin->setValue(20.0);
+	m_cameraRollSpin->setValue(0.0);
+	m_cameraHfovSpin->setValue(90.0);
     m_cameraFovSpin->setValue(90.0);
     updatePerspectiveView();
 }
