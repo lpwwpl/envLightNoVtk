@@ -7,7 +7,7 @@
 #include <cstring>
 #include <vector>
 #include <cctype>
-
+#include <qvector3d.h>
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -871,14 +871,11 @@ bool PanoramaProcessor::directionToPanoramaUV(
 
 	double localUp = dot3(d, basis.up);
 
-	localUp = std::max(
-		-1.0,
-		std::min(1.0, localUp));
+	localUp = std::max(-1.0, std::min(1.0, localUp));
 
 	// Keep exactly the same equirectangular convention currently
 	// used by envLightNoVtk.
-	const double azimuth =
-		std::atan2(localEast, localNorth);
+	const double azimuth = std::atan2(localEast, localNorth);
 
 	u = (azimuth + M_PI) / (2.0 * M_PI);
 
@@ -900,31 +897,58 @@ void PanoramaProcessor::panoramaUVToWorldDirection(
 	const PanoramaBasis& basis,
 	double worldDir[3])
 {
-	const double theta =
-		v * M_PI;
+	const double theta = v * M_PI;
 
-	const double azimuth =
-		u * 2.0 * M_PI - M_PI;
+	const double azimuth = u * 2.0 * M_PI - M_PI;
 
-	const double horizontal =
-		std::sin(theta);
+	const double horizontal = std::sin(theta);
 
 	// Panorama-local ENU.
-	const double localEast =
-		horizontal * std::sin(azimuth);
+	const double localEast = horizontal * std::sin(azimuth);
 
-	const double localNorth =
-		horizontal * std::cos(azimuth);
-
-	const double localUp =
-		std::cos(theta);
+	const double localNorth = horizontal * std::cos(azimuth);
+	const double localUp = std::cos(theta);
 
 	// panorama local -> ENU world
 	for (int i = 0; i < 3; ++i)
 	{
-		worldDir[i] =
-			localEast * basis.east[i]
-			+ localNorth * basis.north[i]
-			+ localUp * basis.up[i];
+		worldDir[i] = localEast * basis.east[i] + localNorth * basis.north[i] + localUp * basis.up[i];
 	}
+}
+
+bool PanoramaProcessor::worldDirectionToPanoramaUV(
+	const QVector3D& worldDir,
+	const PanoramaBasis& basis,
+	QPointF& uv)
+{
+	QVector3D d = worldDir.normalized();
+
+	const QVector3D pE(static_cast<float>(basis.east[0]), static_cast<float>(basis.east[1]), static_cast<float>(basis.east[2]));
+
+	const QVector3D pN(static_cast<float>(basis.north[0]), static_cast<float>(basis.north[1]), static_cast<float>(basis.north[2]));
+
+	const QVector3D pU(static_cast<float>(basis.up[0]), static_cast<float>(basis.up[1]), static_cast<float>(basis.up[2]));
+
+	// World ENU -> Panorama local ENU
+	const double localE = QVector3D::dotProduct(d, pE);
+
+	const double localN = QVector3D::dotProduct(d, pN);
+
+	double localU = QVector3D::dotProduct(d, pU);
+
+	localU = std::max(-1.0, std::min(1.0, localU));
+
+	const double azimuth = std::atan2(localE, localN);
+
+	double u = (azimuth + M_PI) / (2.0 * M_PI);
+
+	if (u < 0.0)		u += 1.0;
+
+	if (u >= 1.0)		u -= 1.0;
+
+	const double v = std::acos(localU) / M_PI;
+
+	uv = QPointF(u, v);
+
+	return true;
 }

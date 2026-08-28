@@ -5,7 +5,7 @@
 #include <vector>
 #include <cstdint>
 class QPointF;
-
+class QVector3D;
 // 8-bit display image. RGB values are expected in [0, 255].
 struct sRGB {
     double r, g, b;
@@ -129,6 +129,11 @@ public:
 	static void cameraToPanoramaXYZ(
         double cameraX, double cameraY, double cameraZ,
         double& panoX, double& panoY, double& panoZ);
+
+	static bool worldDirectionToPanoramaUV(
+		const QVector3D& worldDir,
+		const PanoramaBasis& basis,
+		QPointF& uv);
 
     //static double applyNorthPanoramaOffset(double worldU, double northPanoramaDeg);
 };

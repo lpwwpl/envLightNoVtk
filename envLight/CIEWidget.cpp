@@ -100,605 +100,403 @@ CIEWidget::~CIEWidget() = default;
 
 void CIEWidget::setupUI()
 {
-    QWidget* central =
-        new QWidget(this);
-    setCentralWidget(central);
-
-    QHBoxLayout* centralLayout =
-        new QHBoxLayout(central);
-
-    QSplitter* splitter =
-        new QSplitter(Qt::Horizontal, central);
-
-    centralLayout->addWidget(splitter);
-
-    // ---------------- Left parameter panel ----------------
-    QScrollArea* parameterScroll =
-        new QScrollArea(splitter);
-    parameterScroll->setWidgetResizable(true);
-    parameterScroll->setMinimumWidth(330);
-
-    QWidget* parameterPanel =
-        new QWidget;
-    QVBoxLayout* parameterLayout =
-        new QVBoxLayout(parameterPanel);
-
-    // Sky type.
-    QGroupBox* skyGroup =
-        new QGroupBox(tr("CIE 天空类型"));
-
-    QVBoxLayout* skyLayout =
-        new QVBoxLayout(skyGroup);
-
-    m_skyTypeCombo =
-        new QComboBox;
-
-    for (int type = 1; type <= 15; ++type) {
-        m_skyTypeCombo->addItem(
-            QString("%1. %2")
-                .arg(type, 2, 10, QChar('0'))
-                .arg(skyTypeName(type)));
-    }
-
-    skyLayout->addWidget(m_skyTypeCombo);
-    parameterLayout->addWidget(skyGroup);
-
-    // A-E coefficients.
-    QGroupBox* coefficientGroup =
-        new QGroupBox(tr("CIE 参数 A-E"));
-
-    QGridLayout* coefficientLayout =
-        new QGridLayout(coefficientGroup);
-
-    auto addCoefficientSpin =
-        [&](const QString& name,
-            QDoubleSpinBox*& spin,
-            double minimum,
-            double maximum) {
-
-        const int row =
-            coefficientLayout->rowCount();
-
-        coefficientLayout->addWidget(
-            new QLabel(name),
-            row,
-            0);
-
-        spin =
-            new QDoubleSpinBox;
-
-        spin->setRange(
-            minimum,
-            maximum);
-        spin->setDecimals(3);
-        spin->setSingleStep(0.05);
-
-        coefficientLayout->addWidget(
-            spin,
-            row,
-            1);
-    };
-
-    addCoefficientSpin(
-        "A", m_spinA, -5.0, 5.0);
-    addCoefficientSpin(
-        "B", m_spinB, -5.0, 5.0);
-    addCoefficientSpin(
-        "C", m_spinC, -5.0, 30.0);
-    addCoefficientSpin(
-        "D", m_spinD, -10.0, 5.0);
-    addCoefficientSpin(
-        "E", m_spinE, -5.0, 5.0);
-
-    parameterLayout->addWidget(
-        coefficientGroup);
-
-    // EPW controls.
-    QGroupBox* epwGroup =
-        new QGroupBox(tr("EPW 时间与地点"));
-
-    QVBoxLayout* epwLayout =
-        new QVBoxLayout(epwGroup);
-
-    m_loadEpwButton =
-        new QPushButton(tr("加载 EPW"));
-
-    m_locationInfo =
-        new QLabel(tr("默认地点：北京"));
-    m_locationInfo->setWordWrap(true);
-
-    m_timeSlider =
-        new QSlider(Qt::Horizontal);
-    m_timeSlider->setRange(0, 0);
-    m_timeSlider->setEnabled(false);
-
-    m_sliderInfo =
-        new QLabel(tr("未加载 EPW"));
-
-    epwLayout->addWidget(
-        m_loadEpwButton);
-    epwLayout->addWidget(
-        m_locationInfo);
-    epwLayout->addWidget(
-        m_timeSlider);
-    epwLayout->addWidget(
-        m_sliderInfo);
-
-    parameterLayout->addWidget(epwGroup);
-
-    // Absolute scale.
-    QGroupBox* scaleGroup =
-        new QGroupBox(tr("绝对量标定"));
-
-    QFormLayout* scaleLayout =
-        new QFormLayout(scaleGroup);
-
-    m_scaleModeCombo =
-        new QComboBox;
-
-    m_scaleModeCombo->addItem(
-        tr("EPW 水平散射辐照度"),
-        static_cast<int>(
-            SkyAbsoluteScaleMode::
-                DiffuseHorizontalIrradiance));
-
-    m_scaleModeCombo->addItem(
-        tr("EPW 水平散射照度"),
-        static_cast<int>(
-            SkyAbsoluteScaleMode::
-                DiffuseHorizontalIlluminance));
-
-    m_scaleModeCombo->addItem(
-        tr("EPW 天顶亮度"),
-        static_cast<int>(
-            SkyAbsoluteScaleMode::
-                ZenithLuminance));
-
-    m_targetValueSpin =
-        new QDoubleSpinBox;
-    m_targetValueSpin->setRange(
-        0.0,
-        100000000.0);
-    m_targetValueSpin->setDecimals(3);
-
-    m_directNormalSpin =
-        new QDoubleSpinBox;
-    m_directNormalSpin->setRange(
-        0.0,
-        100000000.0);
-    m_directNormalSpin->setDecimals(3);
-
-    m_scaleUnitLabel =
-        new QLabel("W/m²");
-
-    scaleLayout->addRow(
-        tr("标定方式"),
-        m_scaleModeCombo);
-    scaleLayout->addRow(
-        tr("散射天空目标值"),
-        m_targetValueSpin);
-    scaleLayout->addRow(
-        tr("太阳直射法向值"),
-        m_directNormalSpin);
-    scaleLayout->addRow(
-        tr("当前单位"),
-        m_scaleUnitLabel);
-
-    parameterLayout->addWidget(scaleGroup);
-
-    // Camera.
-    QGroupBox* cameraGroup =
-        new QGroupBox(tr("透视相机"));
-
-    QFormLayout* cameraLayout =
-        new QFormLayout(cameraGroup);
-
-    m_cameraAzimuthSpin =
-        new QDoubleSpinBox;
-    m_cameraAzimuthSpin->setRange(
-        0.0,
-        359.9);
-    m_cameraAzimuthSpin->setDecimals(1);
-    m_cameraAzimuthSpin->setSingleStep(5.0);
-    m_cameraAzimuthSpin->setSuffix("°");
-    m_cameraAzimuthSpin->setValue(180.0);
-
-    m_cameraAltitudeSpin =
-        new QDoubleSpinBox;
-    m_cameraAltitudeSpin->setRange(
-        -89.0,
-        89.0);
-    m_cameraAltitudeSpin->setDecimals(1);
-    m_cameraAltitudeSpin->setSingleStep(5.0);
-    m_cameraAltitudeSpin->setSuffix("°");
-    m_cameraAltitudeSpin->setValue(20.0);
-
-    m_cameraFovSpin =
-        new QDoubleSpinBox;
-    m_cameraFovSpin->setRange(
-        10.0,
-        170.0);
-    m_cameraFovSpin->setDecimals(1);
-    m_cameraFovSpin->setSingleStep(5.0);
-    m_cameraFovSpin->setSuffix("°");
-    m_cameraFovSpin->setValue(90.0);
-
-    m_resetCameraButton =
-        new QPushButton(tr("重置相机"));
-
-    cameraLayout->addRow(
-        tr("观察方位 Az"),
-        m_cameraAzimuthSpin);
-    cameraLayout->addRow(
-        tr("观察仰角 Alt"),
-        m_cameraAltitudeSpin);
-    cameraLayout->addRow(
-        tr("垂直视场 VFOV"),
-        m_cameraFovSpin);
-    cameraLayout->addRow(
-        m_resetCameraButton);
-
-    parameterLayout->addWidget(cameraGroup);
-
-    // EPW weather visual effects.
-    QGroupBox* weatherGroup =
-        new QGroupBox(tr("雨雪与能见度效果"));
-
-    QFormLayout* weatherLayout =
-        new QFormLayout(weatherGroup);
-
-    m_weatherModeCombo = new QComboBox;
-    m_weatherModeCombo->addItem(tr("自动读取 EPW"), -1);
-    m_weatherModeCombo->addItem(tr("关闭天气粒子"), 0);
-    m_weatherModeCombo->addItem(tr("手动：雨"), 1);
-    m_weatherModeCombo->addItem(tr("手动：雪"), 2);
-    m_weatherModeCombo->addItem(tr("手动：雨夹雪"), 3);
-    m_weatherModeCombo->addItem(tr("手动：雾"), 4);
-    m_weatherModeCombo->addItem(tr("手动：冻雨"), 5);
-    m_weatherModeCombo->addItem(tr("手动：冰雹/冰粒"), 6);
-
-    m_weatherIntensitySpin = new QDoubleSpinBox;
-    m_weatherIntensitySpin->setRange(0.0, 1.0);
-    m_weatherIntensitySpin->setDecimals(2);
-    m_weatherIntensitySpin->setSingleStep(0.05);
-    m_weatherIntensitySpin->setValue(0.6);
-    m_weatherIntensitySpin->setEnabled(false);
-
-    m_animateWeatherCheck =
-        new QCheckBox(tr("播放雨雪动画"));
-    m_animateWeatherCheck->setChecked(true);
-
-    m_showWeatherParticlesCheck =
-        new QCheckBox(tr("显示雨丝/雪花粒子"));
-    m_showWeatherParticlesCheck->setChecked(true);
-
-    m_showWeatherGroundCheck =
-        new QCheckBox(tr("显示湿地面/积雪地面"));
-    m_showWeatherGroundCheck->setChecked(true);
-
-    m_weatherStatusLabel = new QLabel(tr("当前：无 EPW 天气数据"));
-    m_weatherStatusLabel->setWordWrap(true);
-
-    weatherLayout->addRow(tr("天气来源"), m_weatherModeCombo);
-    weatherLayout->addRow(tr("手动强度 0-1"), m_weatherIntensitySpin);
-    weatherLayout->addRow(m_animateWeatherCheck);
-    weatherLayout->addRow(m_showWeatherParticlesCheck);
-    weatherLayout->addRow(m_showWeatherGroundCheck);
-    weatherLayout->addRow(tr("EPW 判定"), m_weatherStatusLabel);
-
-    parameterLayout->addWidget(weatherGroup);
-
-    // Display.
-    QGroupBox* displayGroup =
-        new QGroupBox(tr("显示设置"));
-
-    QFormLayout* displayLayout =
-        new QFormLayout(displayGroup);
-
-    m_colorModeCombo =
-        new QComboBox;
-
-    m_colorModeCombo->addItem(
-        tr("自然天空预览"),
-        static_cast<int>(
-            SkyColorMode::NaturalPreview));
-    m_colorModeCombo->addItem(
-        tr("科学伪彩"),
-        static_cast<int>(
-            SkyColorMode::FalseColor));
-    m_colorModeCombo->addItem(
-        tr("亮度灰度"),
-        static_cast<int>(
-            SkyColorMode::GrayscaleLuminance));
-
-    m_toneMapCombo =
-        new QComboBox;
-
-    m_toneMapCombo->addItem(
-        tr("固定参考值（推荐比较类型）"),
-        static_cast<int>(
-            SkyToneMapMode::FixedReference));
-
-    m_toneMapCombo->addItem(
-        tr("每帧自动峰值"),
-        static_cast<int>(
-            SkyToneMapMode::AutoPeak));
-
-    m_referenceValueSpin =
-        new QDoubleSpinBox;
-    m_referenceValueSpin->setRange(
-        0.001,
-        100000000.0);
-    m_referenceValueSpin->setDecimals(3);
-    m_referenceValueSpin->setValue(50.0);
-
-    m_exposureSpin =
-        new QDoubleSpinBox;
-    m_exposureSpin->setRange(
-        0.01,
-        20.0);
-    m_exposureSpin->setDecimals(2);
-    m_exposureSpin->setSingleStep(0.1);
-    m_exposureSpin->setValue(1.0);
-
-    m_gammaSpin =
-        new QDoubleSpinBox;
-    m_gammaSpin->setRange(
-        0.1,
-        5.0);
-    m_gammaSpin->setDecimals(2);
-    m_gammaSpin->setSingleStep(0.1);
-    m_gammaSpin->setValue(2.2);
-
-    m_showSunDiskCheck =
-        new QCheckBox(tr("显示物理太阳盘"));
-    m_showSunDiskCheck->setChecked(true);
-
-    m_showSunGlowCheck =
-        new QCheckBox(tr("自然预览太阳光晕"));
-    m_showSunGlowCheck->setChecked(true);
-
-    m_showHorizonCheck =
-        new QCheckBox(tr("显示地平线"));
-    m_showHorizonCheck->setChecked(true);
-
-    m_exportButton =
-        new QPushButton(tr("导出 1920×1080 PNG"));
-
-    displayLayout->addRow(
-        tr("颜色模式"),
-        m_colorModeCombo);
-    displayLayout->addRow(
-        tr("色调映射"),
-        m_toneMapCombo);
-    displayLayout->addRow(
-        tr("显示参考值"),
-        m_referenceValueSpin);
-    displayLayout->addRow(
-        tr("曝光"),
-        m_exposureSpin);
-    displayLayout->addRow(
-        tr("Gamma"),
-        m_gammaSpin);
-    displayLayout->addRow(
-        m_showSunDiskCheck);
-    displayLayout->addRow(
-        m_showSunGlowCheck);
-    displayLayout->addRow(
-        m_showHorizonCheck);
-    displayLayout->addRow(
-        m_exportButton);
-
-    parameterLayout->addWidget(displayGroup);
-    parameterLayout->addStretch(1);
-
-    parameterScroll->setWidget(parameterPanel);
-
-    // ---------------- Right view tabs ----------------
-    m_viewTabs =
-        new QTabWidget(splitter);
-
-    m_skyWidget =
-        new SkyPolarWidget(m_viewTabs);
-
-    m_perspectiveWidget =
-        new SkyPerspectiveWidget(m_viewTabs);
-
-    m_viewTabs->addTab(
-        m_skyWidget,
-        tr("天空半球分析"));
-
-    m_viewTabs->addTab(
-        m_perspectiveWidget,
-        tr("透视天空"));
-
-    splitter->addWidget(parameterScroll);
-    splitter->addWidget(m_viewTabs);
-    splitter->setStretchFactor(0, 0);
-    splitter->setStretchFactor(1, 1);
-    splitter->setSizes({350, 1000});
-
-    // ---------------- Connections ----------------
-    connect(
-        m_loadEpwButton,
-        &QPushButton::clicked,
-        this,
-        &CIEWidget::onLoadEPW);
-
-    connect(
-        m_timeSlider,
-        &QSlider::valueChanged,
-        this,
-        &CIEWidget::onSliderTime);
-
-    connect(
-        m_skyTypeCombo,
-        QOverload<int>::of(
-            &QComboBox::currentIndexChanged),
-        this,
-        &CIEWidget::onSkyTypeChanged);
-
-    auto connectCoefficient =
-        [this](QDoubleSpinBox* spin) {
-
-        connect(
-            spin,
-            QOverload<double>::of(
-                &QDoubleSpinBox::valueChanged),
-            this,
-            [this](double) {
-                m_renderTimer->start();
-            });
-    };
-
-    connectCoefficient(m_spinA);
-    connectCoefficient(m_spinB);
-    connectCoefficient(m_spinC);
-    connectCoefficient(m_spinD);
-    connectCoefficient(m_spinE);
-
-    connect(
-        m_scaleModeCombo,
-        QOverload<int>::of(
-            &QComboBox::currentIndexChanged),
-        this,
-        &CIEWidget::onScaleModeChanged);
-
-    auto connectPerspectiveSpin =
-        [this](QDoubleSpinBox* spin) {
-        connect(
-            spin,
-            QOverload<double>::of(
-                &QDoubleSpinBox::valueChanged),
-            this,
-            [this](double) {
-                onPerspectiveControlsChanged();
-            });
-    };
-
-    connectPerspectiveSpin(
-        m_cameraAzimuthSpin);
-    connectPerspectiveSpin(
-        m_cameraAltitudeSpin);
-    connectPerspectiveSpin(
-        m_cameraFovSpin);
-    connectPerspectiveSpin(
-        m_targetValueSpin);
-    connectPerspectiveSpin(
-        m_directNormalSpin);
-    connectPerspectiveSpin(
-        m_referenceValueSpin);
-    connectPerspectiveSpin(
-        m_exposureSpin);
-    connectPerspectiveSpin(
-        m_gammaSpin);
-
-    auto connectPerspectiveCombo =
-        [this](QComboBox* combo) {
-        connect(
-            combo,
-            QOverload<int>::of(
-                &QComboBox::currentIndexChanged),
-            this,
-            [this](int) {
-                onPerspectiveControlsChanged();
-            });
-    };
-
-    connectPerspectiveCombo(
-        m_colorModeCombo);
-    connectPerspectiveCombo(
-        m_toneMapCombo);
-
-    connect(
-        m_showSunDiskCheck,
-        &QCheckBox::toggled,
-        this,
-        [this](bool) {
-            onPerspectiveControlsChanged();
-        });
-
-    connect(
-        m_showSunGlowCheck,
-        &QCheckBox::toggled,
-        this,
-        [this](bool) {
-            onPerspectiveControlsChanged();
-        });
-
-    connect(
-        m_showHorizonCheck,
-        &QCheckBox::toggled,
-        this,
-        [this](bool) {
-            onPerspectiveControlsChanged();
-        });
-
-    connect(
-        m_weatherModeCombo,
-        QOverload<int>::of(&QComboBox::currentIndexChanged),
-        this,
-        &CIEWidget::onWeatherModeChanged);
-
-    connect(
-        m_weatherIntensitySpin,
-        QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-        this,
-        [this](double) { onPerspectiveControlsChanged(); });
-
-    connect(
-        m_animateWeatherCheck,
-        &QCheckBox::toggled,
-        this,
-        [this](bool) { onPerspectiveControlsChanged(); });
-
-    connect(
-        m_showWeatherParticlesCheck,
-        &QCheckBox::toggled,
-        this,
-        [this](bool) { onPerspectiveControlsChanged(); });
-
-    connect(
-        m_showWeatherGroundCheck,
-        &QCheckBox::toggled,
-        this,
-        [this](bool) { onPerspectiveControlsChanged(); });
-
-    connect(
-        m_resetCameraButton,
-        &QPushButton::clicked,
-        this,
-        &CIEWidget::onResetCamera);
-
-    connect(
-        m_exportButton,
-        &QPushButton::clicked,
-        this,
-        &CIEWidget::onExportPerspective);
-
-    connect(
-        m_perspectiveWidget,
-        &SkyPerspectiveWidget::cameraChanged,
-        this,
-        [this](
-            double azimuth,
-            double altitude,
-            double vfov) {
-
-            const QSignalBlocker blockAzimuth(
-                m_cameraAzimuthSpin);
-            const QSignalBlocker blockAltitude(
-                m_cameraAltitudeSpin);
-            const QSignalBlocker blockFov(
-                m_cameraFovSpin);
-
-            m_cameraAzimuthSpin->setValue(
-                azimuth);
-            m_cameraAltitudeSpin->setValue(
-                altitude);
-            m_cameraFovSpin->setValue(
-                vfov);
-        });
+	QWidget* central =
+		new QWidget(this);
+	setCentralWidget(central);
+
+	QHBoxLayout* centralLayout =
+		new QHBoxLayout(central);
+
+	QSplitter* splitter =
+		new QSplitter(Qt::Horizontal, central);
+
+	centralLayout->addWidget(splitter);
+
+	// ---------------- Left parameter panel ----------------
+	QScrollArea* parameterScroll =
+		new QScrollArea(splitter);
+	parameterScroll->setWidgetResizable(true);
+	parameterScroll->setMinimumWidth(330);
+
+	QWidget* parameterPanel =
+		new QWidget;
+	QVBoxLayout* parameterLayout =
+		new QVBoxLayout(parameterPanel);
+
+	// Sky type.
+	QGroupBox* skyGroup =
+		new QGroupBox(tr("CIE 天空类型"));
+
+	QVBoxLayout* skyLayout =
+		new QVBoxLayout(skyGroup);
+
+	m_skyTypeCombo =
+		new QComboBox;
+
+	for (int type = 1; type <= 15; ++type) {
+		m_skyTypeCombo->addItem(
+			QString("%1. %2")
+			.arg(type, 2, 10, QChar('0'))
+			.arg(skyTypeName(type)));
+	}
+
+	skyLayout->addWidget(m_skyTypeCombo);
+	parameterLayout->addWidget(skyGroup);
+
+	// A-E coefficients.
+	QGroupBox* coefficientGroup =
+		new QGroupBox(tr("CIE 参数 A-E"));
+
+	QGridLayout* coefficientLayout =
+		new QGridLayout(coefficientGroup);
+
+	auto addCoefficientSpin =
+		[&](const QString& name,
+			QDoubleSpinBox*& spin,
+			double minimum,
+			double maximum) {
+
+				const int row =
+					coefficientLayout->rowCount();
+
+				coefficientLayout->addWidget(
+					new QLabel(name),
+					row,
+					0);
+
+				spin =
+					new QDoubleSpinBox;
+
+				spin->setRange(
+					minimum,
+					maximum);
+				spin->setDecimals(3);
+				spin->setSingleStep(0.05);
+
+				coefficientLayout->addWidget(
+					spin,
+					row,
+					1);
+	};
+
+	addCoefficientSpin("A", m_spinA, -5.0, 5.0);
+	addCoefficientSpin("B", m_spinB, -5.0, 5.0);
+	addCoefficientSpin("C", m_spinC, -5.0, 30.0);
+	addCoefficientSpin("D", m_spinD, -10.0, 5.0);
+	addCoefficientSpin("E", m_spinE, -5.0, 5.0);
+
+	parameterLayout->addWidget(
+		coefficientGroup);
+
+	// EPW controls.
+	QGroupBox* epwGroup = new QGroupBox(tr("EPW 时间与地点"));
+
+	QVBoxLayout* epwLayout = new QVBoxLayout(epwGroup);
+
+	m_loadEpwButton = new QPushButton(tr("加载 EPW"));
+
+	m_locationInfo = new QLabel(tr("默认地点：北京"));
+	m_locationInfo->setWordWrap(true);
+
+	m_timeSlider = new QSlider(Qt::Horizontal);
+	m_timeSlider->setRange(0, 0);
+	m_timeSlider->setEnabled(false);
+
+	m_sliderInfo = new QLabel(tr("未加载 EPW"));
+
+	epwLayout->addWidget(m_loadEpwButton);
+	epwLayout->addWidget(m_locationInfo);
+	epwLayout->addWidget(m_timeSlider);
+	epwLayout->addWidget(m_sliderInfo);
+
+	parameterLayout->addWidget(epwGroup);
+
+	// Absolute scale.
+	QGroupBox* scaleGroup = new QGroupBox(tr("绝对量标定"));
+
+	QFormLayout* scaleLayout = new QFormLayout(scaleGroup);
+
+	m_scaleModeCombo = new QComboBox;
+
+	m_scaleModeCombo->addItem(tr("EPW 水平散射辐照度"), static_cast<int>(SkyAbsoluteScaleMode::DiffuseHorizontalIrradiance));
+
+	m_scaleModeCombo->addItem(tr("EPW 水平散射照度"), static_cast<int>(SkyAbsoluteScaleMode::DiffuseHorizontalIlluminance));
+
+	m_scaleModeCombo->addItem(tr("EPW 天顶亮度"), static_cast<int>(SkyAbsoluteScaleMode::ZenithLuminance));
+
+	m_targetValueSpin = new QDoubleSpinBox;
+	m_targetValueSpin->setRange(0.0, 100000000.0);
+	m_targetValueSpin->setDecimals(3);
+
+	m_directNormalSpin = new QDoubleSpinBox;    m_directNormalSpin->setRange(0.0, 100000000.0);
+	m_directNormalSpin->setDecimals(3);
+
+	m_scaleUnitLabel = new QLabel("W/m²");
+
+	scaleLayout->addRow(tr("标定方式"), m_scaleModeCombo);    scaleLayout->addRow(
+		tr("散射天空目标值"), m_targetValueSpin);
+	scaleLayout->addRow(tr("太阳直射法向值"),
+		m_directNormalSpin);    scaleLayout->addRow(tr("当前单位"), m_scaleUnitLabel);
+
+	parameterLayout->addWidget(scaleGroup);
+
+	// Camera.
+	QGroupBox* cameraGroup = new QGroupBox(tr("透视相机"));
+
+	QFormLayout* cameraLayout = new QFormLayout(cameraGroup);
+
+	m_cameraAzimuthSpin = new QDoubleSpinBox;    m_cameraAzimuthSpin->setRange(0.0, 359.9);
+	m_cameraAzimuthSpin->setDecimals(1);
+	m_cameraAzimuthSpin->setSingleStep(5.0);
+	m_cameraAzimuthSpin->setSuffix("°");
+	m_cameraAzimuthSpin->setValue(180.0);
+
+	m_cameraAltitudeSpin =
+		new QDoubleSpinBox;
+	m_cameraAltitudeSpin->setRange(
+		-89.0,
+		89.0);
+	m_cameraAltitudeSpin->setDecimals(1);
+	m_cameraAltitudeSpin->setSingleStep(5.0);
+	m_cameraAltitudeSpin->setSuffix("°");
+	m_cameraAltitudeSpin->setValue(20.0);
+
+	m_cameraFovSpin = new QDoubleSpinBox;
+	m_cameraFovSpin->setRange(10.0, 170.0);
+	m_cameraFovSpin->setDecimals(1);
+	m_cameraFovSpin->setSingleStep(5.0);
+	m_cameraFovSpin->setSuffix("°");
+	m_cameraFovSpin->setValue(90.0);
+
+	m_resetCameraButton = new QPushButton(tr("重置相机"));
+
+	cameraLayout->addRow(tr("观察方位 Az"), m_cameraAzimuthSpin);
+	cameraLayout->addRow(tr("观察仰角 Alt"), m_cameraAltitudeSpin);
+	cameraLayout->addRow(tr("垂直视场 VFOV"), m_cameraFovSpin);
+	cameraLayout->addRow(m_resetCameraButton);
+
+	parameterLayout->addWidget(cameraGroup);
+
+	// EPW weather visual effects.
+	QGroupBox* weatherGroup =
+		new QGroupBox(tr("雨雪与能见度效果"));
+
+	QFormLayout* weatherLayout =
+		new QFormLayout(weatherGroup);
+
+	m_weatherModeCombo = new QComboBox;
+	m_weatherModeCombo->addItem(tr("自动读取 EPW"), -1);
+	m_weatherModeCombo->addItem(tr("关闭天气粒子"), 0);
+	m_weatherModeCombo->addItem(tr("手动：雨"), 1);
+	m_weatherModeCombo->addItem(tr("手动：雪"), 2);
+	m_weatherModeCombo->addItem(tr("手动：雨夹雪"), 3);
+	m_weatherModeCombo->addItem(tr("手动：雾"), 4);
+	m_weatherModeCombo->addItem(tr("手动：冻雨"), 5);
+	m_weatherModeCombo->addItem(tr("手动：冰雹/冰粒"), 6);
+
+	m_weatherIntensitySpin = new QDoubleSpinBox;
+	m_weatherIntensitySpin->setRange(0.0, 1.0);
+	m_weatherIntensitySpin->setDecimals(2);
+	m_weatherIntensitySpin->setSingleStep(0.05);
+	m_weatherIntensitySpin->setValue(0.6);
+	m_weatherIntensitySpin->setEnabled(false);
+
+	m_animateWeatherCheck =
+		new QCheckBox(tr("播放雨雪动画"));
+	m_animateWeatherCheck->setChecked(true);
+
+	m_showWeatherParticlesCheck =
+		new QCheckBox(tr("显示雨丝/雪花粒子"));
+	m_showWeatherParticlesCheck->setChecked(true);
+
+	m_showWeatherGroundCheck =
+		new QCheckBox(tr("显示湿地面/积雪地面"));
+	m_showWeatherGroundCheck->setChecked(true);
+
+	m_weatherStatusLabel = new QLabel(tr("当前：无 EPW 天气数据"));
+	m_weatherStatusLabel->setWordWrap(true);
+
+	weatherLayout->addRow(tr("天气来源"), m_weatherModeCombo);
+	weatherLayout->addRow(tr("手动强度 0-1"), m_weatherIntensitySpin);
+	weatherLayout->addRow(m_animateWeatherCheck);
+	weatherLayout->addRow(m_showWeatherParticlesCheck);
+	weatherLayout->addRow(m_showWeatherGroundCheck);
+	weatherLayout->addRow(tr("EPW 判定"), m_weatherStatusLabel);
+
+	parameterLayout->addWidget(weatherGroup);
+
+	// Display.
+	QGroupBox* displayGroup = new QGroupBox(tr("显示设置"));
+
+	QFormLayout* displayLayout = new QFormLayout(displayGroup);
+
+	m_colorModeCombo = new QComboBox;
+
+	m_colorModeCombo->addItem(tr("自然天空预览"), static_cast<int>(SkyColorMode::NaturalPreview));
+	m_colorModeCombo->addItem(tr("科学伪彩"), static_cast<int>(SkyColorMode::FalseColor));
+	m_colorModeCombo->addItem(tr("亮度灰度"), static_cast<int>(SkyColorMode::GrayscaleLuminance));
+
+	m_toneMapCombo = new QComboBox;
+
+	m_toneMapCombo->addItem(tr("固定参考值（推荐比较类型）"), static_cast<int>(SkyToneMapMode::FixedReference));
+
+	m_toneMapCombo->addItem(tr("每帧自动峰值"), static_cast<int>(SkyToneMapMode::AutoPeak));
+
+	m_referenceValueSpin = new QDoubleSpinBox;    m_referenceValueSpin->setRange(0.001, 100000000.0);
+	m_referenceValueSpin->setDecimals(3);
+	m_referenceValueSpin->setValue(50.0);
+
+	m_exposureSpin = new QDoubleSpinBox;
+	m_exposureSpin->setRange(0.01, 20.0);
+	m_exposureSpin->setDecimals(2);
+	m_exposureSpin->setSingleStep(0.1);
+	m_exposureSpin->setValue(1.0);
+
+	m_gammaSpin = new QDoubleSpinBox;
+	m_gammaSpin->setRange(0.1, 5.0);
+	m_gammaSpin->setDecimals(2);
+	m_gammaSpin->setSingleStep(0.1);
+	m_gammaSpin->setValue(2.2);
+
+	m_showSunDiskCheck = new QCheckBox(tr("显示物理太阳盘"));
+	m_showSunDiskCheck->setChecked(true);
+
+	m_showSunGlowCheck = new QCheckBox(tr("自然预览太阳光晕"));
+	m_showSunGlowCheck->setChecked(true);
+
+	m_showHorizonCheck = new QCheckBox(tr("显示地平线"));
+	m_showHorizonCheck->setChecked(true);
+
+	m_exportButton = new QPushButton(tr("导出 1920×1080 PNG"));
+
+	displayLayout->addRow(tr("颜色模式"), m_colorModeCombo);    displayLayout->addRow(tr("色调映射"), m_toneMapCombo);
+	displayLayout->addRow(tr("显示参考值"), m_referenceValueSpin);
+	displayLayout->addRow(tr("曝光"), m_exposureSpin);    displayLayout->addRow(tr("Gamma"), m_gammaSpin);
+	displayLayout->addRow(m_showSunDiskCheck);    displayLayout->addRow(m_showSunGlowCheck);    displayLayout->addRow(m_showHorizonCheck);
+	displayLayout->addRow(m_exportButton);
+
+	parameterLayout->addWidget(displayGroup);
+	parameterLayout->addStretch(1);
+
+	parameterScroll->setWidget(parameterPanel);
+
+	// ---------------- Right view tabs ----------------
+	m_viewTabs = new QTabWidget(splitter);
+
+	m_skyWidget = new SkyPolarWidget(m_viewTabs);
+
+	m_perspectiveWidget = new SkyPerspectiveWidget(m_viewTabs);
+
+	m_viewTabs->addTab(m_skyWidget, tr("天空半球分析"));
+
+	m_viewTabs->addTab(m_perspectiveWidget, tr("透视天空"));
+
+	splitter->addWidget(parameterScroll);
+	splitter->addWidget(m_viewTabs);
+	splitter->setStretchFactor(0, 0);
+	splitter->setStretchFactor(1, 1);
+	splitter->setSizes({ 350, 1000 });
+
+	// ---------------- Connections ----------------
+	connect(m_loadEpwButton, &QPushButton::clicked, this, &CIEWidget::onLoadEPW);
+
+	connect(m_timeSlider, &QSlider::valueChanged, this, &CIEWidget::onSliderTime);
+
+	connect(m_skyTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &CIEWidget::onSkyTypeChanged);
+
+	auto connectCoefficient = [this](QDoubleSpinBox* spin) {
+		connect(
+			spin,
+			QOverload<double>::of(
+				&QDoubleSpinBox::valueChanged),
+			this,
+			[this](double) {
+				m_renderTimer->start();
+			});
+	};
+
+	connectCoefficient(m_spinA);
+	connectCoefficient(m_spinB);
+	connectCoefficient(m_spinC);
+	connectCoefficient(m_spinD);
+	connectCoefficient(m_spinE);
+
+	connect(m_scaleModeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &CIEWidget::onScaleModeChanged);
+
+	auto connectPerspectiveSpin = [this](QDoubleSpinBox* spin) {
+		connect(
+			spin,
+			QOverload<double>::of(
+				&QDoubleSpinBox::valueChanged),
+			this,
+			[this](double) {
+				onPerspectiveControlsChanged();
+			});
+	};
+
+	connectPerspectiveSpin(m_cameraAzimuthSpin);
+	connectPerspectiveSpin(m_cameraAltitudeSpin);
+	connectPerspectiveSpin(m_cameraFovSpin);
+	connectPerspectiveSpin(m_targetValueSpin);
+	connectPerspectiveSpin(m_directNormalSpin);
+	connectPerspectiveSpin(m_referenceValueSpin);
+	connectPerspectiveSpin(m_exposureSpin);
+	connectPerspectiveSpin(m_gammaSpin);
+
+	auto connectPerspectiveCombo = [this](QComboBox* combo) {
+		connect(
+			combo,
+			QOverload<int>::of(
+				&QComboBox::currentIndexChanged),
+			this,
+			[this](int) {
+				onPerspectiveControlsChanged();
+			});
+	};
+
+	connectPerspectiveCombo(
+		m_colorModeCombo);
+	connectPerspectiveCombo(
+		m_toneMapCombo);
+
+	connect(m_showSunDiskCheck, &QCheckBox::toggled, this, [this](bool) {			onPerspectiveControlsChanged();		});
+
+	connect(m_showSunGlowCheck, &QCheckBox::toggled, this, [this](bool) {			onPerspectiveControlsChanged();		});
+
+	connect(m_showHorizonCheck, &QCheckBox::toggled, this, [this](bool) {			onPerspectiveControlsChanged();		});
+
+	connect(m_weatherModeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &CIEWidget::onWeatherModeChanged);
+	connect(m_weatherIntensitySpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double) { onPerspectiveControlsChanged(); });
+
+	connect(m_animateWeatherCheck, &QCheckBox::toggled, this, [this](bool) { onPerspectiveControlsChanged(); });
+
+	connect(m_showWeatherParticlesCheck, &QCheckBox::toggled, this, [this](bool) { onPerspectiveControlsChanged(); });
+
+	connect(m_showWeatherGroundCheck, &QCheckBox::toggled, this, [this](bool) { onPerspectiveControlsChanged(); });
+
+	connect(m_resetCameraButton, &QPushButton::clicked, this, &CIEWidget::onResetCamera);
+
+	connect(m_exportButton, &QPushButton::clicked, this, &CIEWidget::onExportPerspective);
+
+	connect(m_perspectiveWidget, &SkyPerspectiveWidget::cameraChanged, this, [this](
+		double azimuth,
+		double altitude,
+		double vfov) {
+
+			const QSignalBlocker blockAzimuth(
+				m_cameraAzimuthSpin);
+			const QSignalBlocker blockAltitude(
+				m_cameraAltitudeSpin);
+			const QSignalBlocker blockFov(
+				m_cameraFovSpin);
+
+			m_cameraAzimuthSpin->setValue(
+				azimuth);
+			m_cameraAltitudeSpin->setValue(
+				altitude);
+			m_cameraFovSpin->setValue(
+				vfov);
+		});
 }
 
 void CIEWidget::onSkyTypeChanged(

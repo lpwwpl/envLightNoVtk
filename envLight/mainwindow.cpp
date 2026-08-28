@@ -410,6 +410,8 @@ void MainWindow::onUpdateParameters() {
 			outH,
 			m_panoramaBasis,
 			flipVertical);
+
+	m_panoramaLabel->setPanoramaBasis(m_panoramaBasis);
     //m_panoramaLabel->setNorthDirectionDegrees(northPanoramaDeg);
     //std::vector<QPointF> corners = p.computeCornerUVs(cx, cy, cz, yaw, pitch, roll, hfov, vfov, outW, outH, northPanoramaDeg, flipVertical);
     if (corners.size() >= 3) {

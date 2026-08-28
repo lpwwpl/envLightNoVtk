@@ -167,7 +167,7 @@ public:
     void setPanoramaImage(const Image& img);
     void setCorners(const std::vector<QPointF>& corners);
     void clearCorners();
-    void setNorthDirectionDegrees(double degrees);
+	void setPanoramaBasis(PanoramaBasis basis) { m_panoramaBasis = basis; }
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -176,5 +176,6 @@ private:
     QPixmap m_pixmap;
     bool m_hasCorners = false;
     std::vector<QPointF> m_corners;
-    double m_northDirectionDeg = 180.0;
+    //double m_northDirectionDeg = 180.0;
+	PanoramaBasis m_panoramaBasis;
 };

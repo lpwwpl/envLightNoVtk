@@ -984,52 +984,309 @@ void PanoramaLabel::clearCorners()
     update();
 }
 
-void PanoramaLabel::setNorthDirectionDegrees(double degrees)
-{
-    m_northDirectionDeg = wrap360(degrees);
-    update();
-}
-
 void PanoramaLabel::paintEvent(QPaintEvent* event)
 {
-    if (m_pixmap.isNull()) {
-        QLabel::paintEvent(event);
-        return;
-    }
+	//if (m_pixmap.isNull()) {
+	//    QLabel::paintEvent(event);
+	//    return;
+	//}
 
-    QPainter painter(this);
-    const QPixmap scaled = m_pixmap.scaled(size(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
-    const int x = (width() - scaled.width()) / 2;
-    const int y = (height() - scaled.height()) / 2;
-    painter.drawPixmap(x, y, scaled);
+	//QPainter painter(this);
+	//const QPixmap scaled = m_pixmap.scaled(size(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+	//const int x = (width() - scaled.width()) / 2;
+	//const int y = (height() - scaled.height()) / 2;
+	//painter.drawPixmap(x, y, scaled);
 
-    const double imgW = scaled.width();
-    const double imgH = scaled.height();
-    const char* labels[4] = {"N", "E", "S", "W"};
+	//const double imgW = scaled.width();
+	//const double imgH = scaled.height();
+	//const char* labels[4] = {"N", "E", "S", "W"};
 
-    painter.setPen(QPen(QColor(255, 220, 40, 220), 1.5, Qt::DashLine));
-    QFont f = painter.font();
-    f.setBold(true);
-    painter.setFont(f);
+	//painter.setPen(QPen(QColor(255, 220, 40, 220), 1.5, Qt::DashLine));
+	//QFont f = painter.font();
+	//f.setBold(true);
+	//painter.setFont(f);
 
-    for (int i = 0; i < 4; ++i) {
-        const double deg = wrap360(m_northDirectionDeg + i * 90.0);
-        const double u = deg / 360.0;
-        const double px = x + u * imgW;
-        painter.drawLine(QPointF(px, y), QPointF(px, y + imgH));
-        painter.drawText(QPointF(px + 4.0, y + 18.0), labels[i]);
-    }
+	//for (int i = 0; i < 4; ++i) {
+	//    const double deg = wrap360(m_northDirectionDeg + i * 90.0);
+	//    const double u = deg / 360.0;
+	//    const double px = x + u * imgW;
+	//    painter.drawLine(QPointF(px, y), QPointF(px, y + imgH));
+	//    painter.drawText(QPointF(px + 4.0, y + 18.0), labels[i]);
+	//}
 
-    if (m_hasCorners && m_corners.size() >= 3) {
-        QPolygonF poly;
-        for (const auto& uv : m_corners)
-            poly << QPointF(uv.x() * imgW + x, uv.y() * imgH + y);
+	//if (m_hasCorners && m_corners.size() >= 3) {
+	//    QPolygonF poly;
+	//    for (const auto& uv : m_corners)
+	//        poly << QPointF(uv.x() * imgW + x, uv.y() * imgH + y);
 
-        painter.setPen(QPen(Qt::red, 2));
-        painter.drawPolyline(poly);
-        if (poly.size() > 2)
-            painter.drawLine(poly.last(), poly.first());
-    }
+	//    painter.setPen(QPen(Qt::red, 2));
+	//    painter.drawPolyline(poly);
+	//    if (poly.size() > 2)
+	//        painter.drawLine(poly.last(), poly.first());
+	//}
+	Q_UNUSED(event);
+
+	if (m_pixmap.isNull())
+	{
+		QLabel::paintEvent(event);
+		return;
+	}
+
+	QPainter painter(this);
+
+	painter.setRenderHint(QPainter::Antialiasing, true);
+
+	const QPixmap scaled = m_pixmap.scaled(size(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
+	const int x = (width() - scaled.width()) / 2;
+
+	const int y = (height() - scaled.height()) / 2;
+
+	painter.drawPixmap(x, y, scaled);
+
+	const double imgW = static_cast<double>(scaled.width());
+
+	const double imgH = static_cast<double>(scaled.height());
+
+
+	auto uvToScreen = [x, y, imgW, imgH](const QPointF& uv)
+	{
+		return QPointF(x + uv.x() * imgW, y + uv.y() * imgH);
+	};
+
+	PanoramaProcessor p;
+	// ============================================================
+	// 1. Draw World horizon
+	//
+	// World horizon means:
+	//
+	//      world Z = 0
+	//
+	// Sample all azimuth directions in World ENU,
+	// then convert them into Panorama UV.
+	//
+	// When panorama U is tilted, this line becomes curved.
+	// ============================================================
+	painter.setPen(QPen(QColor(255, 220, 40, 180), 1, Qt::SolidLine));
+
+	QVector<QPointF> horizonSegment;
+	QPointF previousUV;
+
+	bool hasPrevious = false;
+	for (int deg = 0; deg <= 360; ++deg)
+	{
+		const double a = deg * M_PI / 180.0;
+
+		// World ENU:
+		//
+		// azimuth 0 = North
+		// azimuth 90 = East
+
+		const QVector3D worldDir(static_cast<float>(std::sin(a)), static_cast<float>(std::cos(a)), 0.0f);
+
+		QPointF uv;
+
+		if (!p.worldDirectionToPanoramaUV(worldDir, m_panoramaBasis, uv))
+		{
+			continue;
+		}
+
+
+		// Equirectangular panorama has a seam at u=0/1.
+		//
+		// Do not connect across that seam.
+		//if (hasPrevious &&
+		//	std::abs(uv.x() - previousUV.x()) > 0.5)
+		//{
+			//if (horizonSegment.size() >= 2)
+			//{
+			//	painter.drawPolyline(horizonSegment.constData(),
+			//		horizonSegment.size());
+			//}
+		//	horizonSegment.clear();
+		//}
+
+
+		horizonSegment.push_back(uvToScreen(uv));
+
+		previousUV = uv;
+
+		hasPrevious = true;
+	}
+
+
+	if (horizonSegment.size() >= 2)
+	{
+		painter.drawPolyline(horizonSegment.constData(), horizonSegment.size());
+	}
+
+
+	// ============================================================
+	// 2. Draw world N / E / S / W markers
+	//
+	// IMPORTANT:
+	//
+	// These are WORLD directions projected into Panorama UV.
+	//
+	// So after PanoramaBasis tilts:
+	//
+	// N/E/S/W are no longer necessarily at v=0.5.
+	// ============================================================
+
+	struct DirectionMarker
+	{
+		const char* label;
+		QVector3D worldDir;
+		QColor color;
+	};
+	const DirectionMarker markers[] =
+	{
+		{
+			"N",
+			QVector3D(0.0f, 1.0f, 0.0f),
+			QColor(80, 255, 120)
+		},
+
+		{
+			"E",
+			QVector3D(1.0f, 0.0f, 0.0f),
+			QColor(255, 100, 80)
+		},
+
+		{
+			"S",
+			QVector3D(0.0f, -1.0f, 0.0f),
+			QColor(80, 220, 255)
+		},
+
+		{
+			"W",
+			QVector3D(-1.0f, 0.0f, 0.0f),
+			QColor(255, 180, 80)
+		}
+	};
+
+
+	QFont directionFont = painter.font();
+	directionFont.setBold(true);
+
+	directionFont.setPointSize(directionFont.pointSize() + 1);
+
+	painter.setFont(directionFont);
+
+
+	for (const auto& marker : markers)
+	{
+		QPointF uv;
+
+		if (!p.worldDirectionToPanoramaUV(
+			marker.worldDir,
+			m_panoramaBasis,
+			uv))
+		{
+			continue;
+		}
+
+		const QPointF p = uvToScreen(uv);
+
+		// Small circle
+		painter.setPen(QPen(marker.color, 1.0));
+		painter.setBrush(QColor(marker.color.red(), marker.color.green(), marker.color.blue(), 80));
+		painter.drawEllipse(p, 2.0, 2.0);
+		// Cross
+		painter.drawLine(
+			QPointF(
+				p.x() - 8.0,
+				p.y()),
+			QPointF(
+				p.x() + 8.0,
+				p.y()));
+
+		painter.drawLine(
+			QPointF(
+				p.x(),
+				p.y() - 8.0),
+			QPointF(
+				p.x(),
+				p.y() + 8.0));
+
+
+		painter.setBrush(
+			Qt::NoBrush);
+
+
+		painter.drawText(
+			QPointF(
+				p.x() + 7.0,
+				p.y() - 7.0),
+			marker.label);
+	}
+
+
+	// ============================================================
+	// 3. Draw Panorama local pN / pE / pU
+	//
+	// Optional but very useful for debugging.
+	//
+	// Because pN/pE/pU are the panorama's own axes,
+	// their source UV positions are fixed.
+	// ============================================================
+	painter.setPen(QPen(QColor(220, 220, 230, 180), 1.0));
+
+	auto drawLocalMarker = [&](double u, double v, const QString& text)
+	{
+		const QPointF p = uvToScreen(QPointF(u, v));
+
+		painter.drawEllipse(p, 3.5, 3.5);
+
+		painter.drawText(QPointF(p.x() + 5.0, p.y() + 15.0), text);
+	};
+
+
+	// Based on current panorama convention:
+	//
+	// local North -> u=0.5
+	// local East  -> u=0.75
+	// local Up    -> v=0
+	//
+	drawLocalMarker(0.50, 0.50, "pN");
+	drawLocalMarker(0.75, 0.50, "pE");
+	drawLocalMarker(0.50, 0.0, "pU");
+
+	// ============================================================
+	// 4. Draw ROI polygon
+	//
+	// Avoid drawing a long line across panorama seam.
+	// ============================================================
+	if (m_hasCorners &&		m_corners.size() >= 3)
+	{
+		painter.setPen(QPen(Qt::red, 2.0));
+
+		painter.setBrush(Qt::NoBrush);
+
+
+		for (int i = 0; i < m_corners.size(); ++i)
+		{
+			const QPointF uv0 = m_corners[i];
+			const QPointF uv1 = m_corners[(i + 1) % m_corners.size()];
+
+			// Crossing panorama seam.
+			//
+			// Don't connect directly from e.g.
+			// u=0.98 to u=0.02.
+			if (std::abs(uv0.x() - uv1.x()) > 0.5)
+			{
+				continue;
+			}
+
+			painter.drawLine(uvToScreen(uv0), uvToScreen(uv1));
+		}
+		// Draw ROI corners.		painter.setBrush(Qt::red);
+		//for (const QPointF& uv : m_corners)
+		//{
+		//	painter.drawEllipse(uvToScreen(uv), 1.0, 1.0);
+		//}
+	}
 }
 
 void OpenGLSceneWidget::setPanoramaBasis(
