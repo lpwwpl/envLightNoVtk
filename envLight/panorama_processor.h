@@ -100,7 +100,8 @@ public:
         int outW, int outH, int aa,
 		const PanoramaBasis& basis,
         //double northPanoramaDeg = 180.0,
-        bool flipVertical = false);
+        bool flipVertical = false,
+        bool localCamera = true);
 
     // Display-only conversion: tone map scene-linear HDR to 8-bit sRGB.
     // This never modifies the source HDR image.
@@ -114,7 +115,8 @@ public:
         int outW, int outH,
         //double northPanoramaDeg = 180.0,
 		const PanoramaBasis& basis,
-        bool flipVertical = false);
+        bool flipVertical = false,
+        bool localCamera = true);
 
     // Helper: ray intersection with unit sphere.
     //static bool raySphereIntersection(const double origin[3], const double dir[3],

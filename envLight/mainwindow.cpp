@@ -91,9 +91,18 @@ void MainWindow::setupUI() {
     QVBoxLayout* leftLayout = new QVBoxLayout(leftPanel);
     leftLayout->setAlignment(Qt::AlignTop);
 
+    // 全局参数分组
+    QGroupBox* globalGroup = new QGroupBox("全局参数", this);
+    QFormLayout* globalLayout = new QFormLayout(globalGroup);
+
     // 相机参数分组
     QGroupBox* cameraGroup = new QGroupBox("相机参数", this);
     QFormLayout* formLayout = new QFormLayout(cameraGroup);
+
+    m_localCameraCheck = new QCheckBox("Local Camera");
+    m_localCameraCheck->setChecked(true);
+    m_localCameraCheck->setToolTip("选中：使用当前 CameraTransform 局部相机坐标方式。\n未选中：使用 SkyPerspectiveWidget::cameraRay 的 ENU 导航相机方式。");
+    formLayout->addRow("相机模式:", m_localCameraCheck);
 
     m_cxSpin = new QDoubleSpinBox; m_cxSpin->setRange(-1, 1); m_cxSpin->setSingleStep(0.05); m_cxSpin->setValue(0.5);
     m_cySpin = new QDoubleSpinBox; m_cySpin->setRange(-1, 1); m_cySpin->setSingleStep(0.05); m_cySpin->setValue(0.2);
@@ -154,7 +163,7 @@ void MainWindow::setupUI() {
 
 
 	QWidget* northWidget =
-		new QWidget(cameraGroup);
+		new QWidget(globalGroup);
 
 	QHBoxLayout* northLayout =
 		new QHBoxLayout(northWidget);
@@ -163,7 +172,7 @@ void MainWindow::setupUI() {
 
 
 	QWidget* eastWidget =
-		new QWidget(cameraGroup);
+		new QWidget(globalGroup);
 
 	QHBoxLayout* eastLayout =
 		new QHBoxLayout(eastWidget);
@@ -174,7 +183,7 @@ void MainWindow::setupUI() {
 	eastLayout->addWidget(m_panoEastZ);
 	//eastLayout->addWidget(m_applyPanoEastBtn);
 
-	formLayout->addRow(
+	globalLayout->addRow(
 		"全景 E 向量:",
 		eastWidget);
 
@@ -183,13 +192,13 @@ void MainWindow::setupUI() {
 	northLayout->addWidget(m_panoNorthY);
 	northLayout->addWidget(m_panoNorthZ);
 
-	formLayout->addRow(
+	globalLayout->addRow(
 		"全景 N 向量:",
 		northWidget);
 
 
 	QWidget* upWidget =
-		new QWidget(cameraGroup);
+		new QWidget(globalGroup);
 
 	QHBoxLayout* upLayout =
 		new QHBoxLayout(upWidget);
@@ -200,7 +209,7 @@ void MainWindow::setupUI() {
 	upLayout->addWidget(m_panoUpY);
 	upLayout->addWidget(m_panoUpZ);
 
-	formLayout->addRow(
+	globalLayout->addRow(
 		"全景 U 向量:",
 		upWidget);
 
@@ -212,11 +221,14 @@ void MainWindow::setupUI() {
 
     m_outWSpin = new QSpinBox; m_outWSpin->setRange(64, 2048); m_outWSpin->setValue(800);
     m_outHSpin = new QSpinBox; m_outHSpin->setRange(64, 2048); m_outHSpin->setValue(600);
-    formLayout->addRow("输出宽度:", m_outWSpin);
-    formLayout->addRow("输出高度:", m_outHSpin);
+    globalLayout->addRow("输出宽度:", m_outWSpin);
+    globalLayout->addRow("输出高度:", m_outHSpin);
 
     m_loadBtn = new QPushButton("加载全景图");
-    formLayout->addRow(m_loadBtn);
+    globalLayout->addRow(m_loadBtn);
+
+    globalGroup->setLayout(globalLayout);
+    leftLayout->addWidget(globalGroup);
 
     cameraGroup->setLayout(formLayout);
     leftLayout->addWidget(cameraGroup);
@@ -321,6 +333,7 @@ void MainWindow::setupConnections() {
 		m_panoUpZ);
 
 
+    connect(m_localCameraCheck, &QCheckBox::toggled, this, &MainWindow::onUpdateParameters);
     connect(m_flipVerticalCheck, &QCheckBox::toggled, this, &MainWindow::onUpdateParameters);
     connect(m_outWSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, &MainWindow::onUpdateParameters);
     connect(m_outHSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, &MainWindow::onUpdateParameters);
@@ -372,6 +385,7 @@ void MainWindow::onUpdateParameters() {
     double vfov = m_vfovSpin->value();
     //double northPanoramaDeg = m_northPanoramaSpin->value();
     bool flipVertical = m_flipVerticalCheck->isChecked();
+    bool localCamera = m_localCameraCheck->isChecked();
     int outW = m_outWSpin->value();
     int outH = m_outHSpin->value();
 	///////////////////////////////
@@ -409,7 +423,8 @@ void MainWindow::onUpdateParameters() {
 			outW,
 			outH,
 			m_panoramaBasis,
-			flipVertical);
+			flipVertical,
+			localCamera);
 
 	m_panoramaLabel->setPanoramaBasis(m_panoramaBasis);
     //m_panoramaLabel->setNorthDirectionDegrees(northPanoramaDeg);
@@ -434,7 +449,8 @@ void MainWindow::onUpdateParameters() {
 		outW,
 		outH,
 		m_panoramaBasis,
-		flipVertical);
+		flipVertical,
+		localCamera);
 }
 
 void MainWindow::onPerspectiveViewReady(const QImage& img) {

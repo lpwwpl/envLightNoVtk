@@ -45,6 +45,7 @@ private:
     QDoubleSpinBox* m_yawSpin, * m_pitchSpin, * m_rollSpin;
     QDoubleSpinBox* m_hfovSpin, * m_vfovSpin;
     //QDoubleSpinBox* m_northPanoramaSpin;
+    QCheckBox* m_localCameraCheck;
     QCheckBox* m_flipVerticalCheck;
     QSpinBox* m_outWSpin, * m_outHSpin;
     QPushButton* m_loadBtn;

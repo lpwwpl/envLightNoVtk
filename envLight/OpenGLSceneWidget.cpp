@@ -140,7 +140,8 @@ void OpenGLSceneWidget::setCameraParameters(
     int outW, int outH,
     //double northPanoramaDeg,
 	const PanoramaBasis& panoramaBasis,
-    bool flipVertical)
+    bool flipVertical,
+    bool localCamera)
 {
     m_cx = cx;
     m_cy = cy;
@@ -153,6 +154,7 @@ void OpenGLSceneWidget::setCameraParameters(
     m_outW = outW;
     m_outH = outH;
     m_flipVertical = flipVertical;
+    m_localCamera = localCamera;
 
     //const double normalizedNorth = wrap360(northPanoramaDeg);
     //if (std::abs(normalizedNorth - m_northPanoramaDeg) > 1e-9) {
@@ -652,6 +654,7 @@ void OpenGLSceneWidget::updateSceneGeometry()
         m_hfov, m_vfov,
         m_outW, m_outH,
         m_flipVertical,
+        m_localCamera,
         m_rayCtx);
 
     m_hitValid = m_rayContextValid;
@@ -689,7 +692,8 @@ void OpenGLSceneWidget::updatePerspective()
         2,
 		m_panoramaBasis,
         //m_northPanoramaDeg,
-        m_flipVertical);
+        m_flipVertical,
+        m_localCamera);
 
     const Image display = PanoramaProcessor::toneMapForDisplay(hdr, 1.0f, 2.2f);
     emit perspectiveViewReady(toQImage(display));

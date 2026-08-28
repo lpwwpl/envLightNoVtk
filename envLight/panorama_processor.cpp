@@ -485,7 +485,8 @@ std::vector<QPointF> PanoramaProcessor::computeCornerUVs(
     int outW, int outH,
     //double northPanoramaDeg,
 	const PanoramaBasis& basis,
-    bool flipVertical)
+    bool flipVertical,
+    bool localCamera)
 {
     std::vector<QPointF> polygon;
     polygon.reserve(200);
@@ -497,6 +498,7 @@ std::vector<QPointF> PanoramaProcessor::computeCornerUVs(
             hfov_deg, vfov_deg,
             outW, outH,
             flipVertical,
+            localCamera,
             rayCtx))
     {
         return polygon;
@@ -576,7 +578,8 @@ HDRImage PanoramaProcessor::perspectiveFromPanorama(const HDRImage& pano,
     int outW, int outH, int aa,
 	const PanoramaBasis& basis,
     //double northPanoramaDeg,
-    bool flipVertical)
+    bool flipVertical,
+    bool localCamera)
 {
     HDRImage output(outW, outH);
     if (pano.width == 0 || pano.height == 0 || outW <= 0 || outH <= 0)
@@ -591,6 +594,7 @@ HDRImage PanoramaProcessor::perspectiveFromPanorama(const HDRImage& pano,
             hfov_deg, vfov_deg,
             outW, outH,
             flipVertical,
+            localCamera,
             rayCtx))
     {
         return output;

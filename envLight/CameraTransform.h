@@ -148,6 +148,66 @@ inline void localPositionToENU(
     multiplyMatVec(cameraToENU, local, originENU);
 }
 
+inline void buildNavigationCameraToENU(
+    double yawDeg,
+    double pitchDeg,
+    double rollDeg,
+    double R[3][3])
+{
+    const double yaw = yawDeg * kPi / 180.0;
+    const double pitch = pitchDeg * kPi / 180.0;
+    const double roll = rollDeg * kPi / 180.0;
+
+    double forward[3] = {
+        std::cos(pitch) * std::sin(yaw),
+        std::cos(pitch) * std::cos(yaw),
+        std::sin(pitch)
+    };
+
+    double right[3] = {
+        forward[1],
+        -forward[0],
+        0.0
+    };
+    if (!normalize3(right)) {
+        right[0] = 1.0;
+        right[1] = 0.0;
+        right[2] = 0.0;
+    }
+
+    double up[3] = {
+        right[1] * forward[2] - right[2] * forward[1],
+        right[2] * forward[0] - right[0] * forward[2],
+        right[0] * forward[1] - right[1] * forward[0]
+    };
+    normalize3(up);
+
+    const double c = std::cos(roll);
+    const double sr = std::sin(roll);
+    double rolledRight[3] = {
+        c * right[0] + sr * up[0],
+        c * right[1] + sr * up[1],
+        c * right[2] + sr * up[2]
+    };
+    double rolledUp[3] = {
+        -sr * right[0] + c * up[0],
+        -sr * right[1] + c * up[1],
+        -sr * right[2] + c * up[2]
+    };
+
+    R[0][0] = rolledRight[0];
+    R[1][0] = rolledRight[1];
+    R[2][0] = rolledRight[2];
+
+    R[0][1] = -rolledUp[0];
+    R[1][1] = -rolledUp[1];
+    R[2][1] = -rolledUp[2];
+
+    R[0][2] = forward[0];
+    R[1][2] = forward[1];
+    R[2][2] = forward[2];
+}
+
 inline bool buildRayContext(
     double cameraX,
     double cameraY,
@@ -160,13 +220,22 @@ inline bool buildRayContext(
     int outW,
     int outH,
     bool flipVertical,
+    bool localCamera,
     RayContext& ctx)
 {
     if (outW <= 0 || outH <= 0) return false;
     if (!(hfovDeg > 0.0 && hfovDeg < 180.0)) return false;
 
-    buildCameraToENURotation(yawDeg, pitchDeg, rollDeg, ctx.cameraToENU);
-    localPositionToENU(ctx.cameraToENU, cameraX, cameraY, cameraZ, ctx.originENU);
+    if (localCamera) {
+        buildCameraToENURotation(yawDeg, pitchDeg, rollDeg, ctx.cameraToENU);
+        localPositionToENU(ctx.cameraToENU, cameraX, cameraY, cameraZ, ctx.originENU);
+    }
+    else {
+        buildNavigationCameraToENU(yawDeg, pitchDeg, rollDeg, ctx.cameraToENU);
+        ctx.originENU[0] = cameraX;
+        ctx.originENU[1] = cameraY;
+        ctx.originENU[2] = cameraZ;
+    }
 
     const double hfov = hfovDeg * kPi / 180.0;
     ctx.focalX = (outW / 2.0) / std::tan(hfov / 2.0);

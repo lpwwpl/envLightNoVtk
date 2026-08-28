@@ -47,7 +47,8 @@ public:
         int outW, int outH,
         //double northPanoramaDeg = 180.0,
 		const PanoramaBasis& panoramaBasis,
-        bool flipVertical = false);
+        bool flipVertical = false,
+        bool localCamera = true);
 
 	// World ENU永不动它
 	//修改Panorama ENU
@@ -143,6 +144,7 @@ private:
     int m_outH = 600;
     double m_northPanoramaDeg = 180.0;
     bool m_flipVertical = false;
+    bool m_localCamera = true;
 
     CameraTransform::RayContext m_rayCtx;
     bool m_rayContextValid = false;
