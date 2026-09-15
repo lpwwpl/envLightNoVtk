@@ -1,0 +1,60 @@
+SkyPerspectiveWidget::cameraRay() 当前直接按 ENU 导航语义构造相机：
+Yaw = 0°   -> 朝 North
+Yaw = 90°  -> 朝 East
+Pitch      -> 仰角
+Roll       -> 绕 forward 旋转
+
+dir =
+    normalize(
+        forward
+        + screenX * rolledRight
+        + screenY * rolledUp);
+
+
+而 PanoramaProcessor 当前通过 CameraTransform，使用的是“传统相机局部坐标 + 固定 Camera→ENU 基变换”：
+
++Xc -> North
++Yc -> Up
++Zc -> East
+
+而且 cx/cy/cz 当前也是相机局部坐标位移，会跟着 yaw/pitch/roll 一起转到 ENU。
+
+所以我建议 checkbox 定义为：
+
+☑ Local Camera
+    当前方式
+    Xc/Yc/Zc = 相机局部坐标位置
+    yaw/pitch/roll = 当前 CameraTransform 历史定义
+
+☐ Local Camera
+    SkyPerspective 方式
+    Xc/Yc/Zc = 世界 ENU 位置
+    Xc = East
+    Yc = North
+    Zc = Up
+    yaw=0 朝 North
+    yaw=90 朝 East
+    pitch = 仰角
+
+这样含义最清楚。
+两种模式最终区别
+参数	                   Local Camera ☑	Local Camera ☐
+Xc	                  Camera X	             World East
+Yc	                  Camera Y	             World North
+Zc	                  Camera Forward             World Up
+X/Y/Z 是否随 RPY 转   是	                           否
+Yaw=0	                 历史 Camera 定义            North
+Yaw=90	                 历史 Camera 定义            East
+Pitch	                 Euler Ry	            天文/导航仰角
+Roll	                Euler Rx       	            绕视线 Roll
+HFOV/VFOV	 支持	                         支持
+PanoramaBasis	 支持	                         支持
+
+
+对“看全景图、选一个方向生成 Perspective”这种用途，我更推荐：
+
+Local Camera = false
+
+
+另外，SkyPerspective 的 ray 和 Pano 的 ray 在 Local Camera=false 时可以做到数学上一致，但二者最终输出仍不是同一件事：SkyPerspective 用 ray 去计算 CIE 天空亮度；Pano 用相同 ray 从 originENU 与单位球求交，再通过 PanoramaBasis 得到 (u,v) 并采样 HDR 全景图。当前 Pano 的 perspectiveFromPanorama() 正是 pixelToENUDirection → raySphereIntersection → samplePanoramaBilinear 这条链
+
