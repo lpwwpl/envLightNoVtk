@@ -1,4 +1,5 @@
-﻿#include "MainWindow.h"
+#include "MainWindow.h"
+#include "StandardSkyViewer.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -67,6 +68,12 @@ void MainWindow::showSkyViewer() {
     viewer->show();
 }
 
+void MainWindow::showStandardSkyViewer() {
+    StandardSkyViewer* viewer = new StandardSkyViewer();
+    viewer->setAttribute(Qt::WA_DeleteOnClose);
+    viewer->show();
+}
+
 void MainWindow::createMenu() {
     // 创建菜单栏
     m_menuBar = this->menuBar();
@@ -78,8 +85,12 @@ void MainWindow::createMenu() {
     QAction* skyAction = new QAction("CIE Sky Viewer", this);
     viewMenu->addAction(skyAction);
 
+    QAction* standardSkyAction = new QAction("CIE Standard General Sky", this);
+    viewMenu->addAction(standardSkyAction);
+
     // 连接信号
     connect(skyAction, &QAction::triggered, this, &MainWindow::showSkyViewer);
+    connect(standardSkyAction, &QAction::triggered, this, &MainWindow::showStandardSkyViewer);
 }
 
 void MainWindow::setupUI() {

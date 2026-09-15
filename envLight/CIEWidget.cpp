@@ -2,6 +2,7 @@
 
 #include "EpwReader.h"
 #include "SkyPolarWidget.h"
+#include "SkySceneWidget.h"
 #include "SunSky.hpp"
 
 #include <QCheckBox>
@@ -26,6 +27,41 @@
 #include <cmath>
 
 namespace {
+// 功能：创建 CIE ENU 分量编辑框，统一输入范围和精度。
+QDoubleSpinBox* makeCieEnuSpin(QWidget* parent, double value)
+{
+    QDoubleSpinBox* spin = new QDoubleSpinBox(parent); spin->setRange(-1.0, 1.0); spin->setDecimals(4); spin->setSingleStep(0.05); spin->setValue(value); return spin;
+}
+
+// 功能：把 E/N/U 的三个分量编辑框排成一行，便于直接阅读三维向量。
+QWidget* makeCieEnuRow(QWidget* parent, QDoubleSpinBox* x, QDoubleSpinBox* y, QDoubleSpinBox* z)
+{
+    QWidget* row = new QWidget(parent); QHBoxLayout* layout = new QHBoxLayout(row); layout->setContentsMargins(0, 0, 0, 0); layout->addWidget(x); layout->addWidget(y); layout->addWidget(z); return row;
+}
+
+// 功能：创建与 StandardSkyViewer 完全一致的 Viewer Camera 位置输入框。
+QDoubleSpinBox* makeViewerCameraPositionSpin(QWidget* parent, double value)
+{
+    QDoubleSpinBox* spin = new QDoubleSpinBox(parent); spin->setRange(-1.0, 1.0); spin->setDecimals(4); spin->setSingleStep(0.05); spin->setValue(value); spin->setKeyboardTracking(false); return spin;
+}
+
+// 功能：创建与 StandardSkyViewer 完全一致的 Viewer Camera 角度输入框。
+QDoubleSpinBox* makeViewerCameraAngleSpin(QWidget* parent, double minimum, double maximum, double value, double step)
+{
+    QDoubleSpinBox* spin = new QDoubleSpinBox(parent); spin->setRange(minimum, maximum); spin->setDecimals(2); spin->setSingleStep(step); spin->setSuffix(QString::fromUtf8("°")); spin->setValue(value); spin->setKeyboardTracking(false); return spin;
+}
+
+// 功能：把世界 ENU 单位向量转换为导航方位角，0°=North、90°=East。
+double worldEnuAzimuthDeg(const QVector3D& direction)
+{
+    const double azimuth = std::atan2(static_cast<double>(direction.x()), static_cast<double>(direction.y())) * 180.0 / 3.14159265358979323846; return azimuth < 0.0 ? azimuth + 360.0 : azimuth;
+}
+
+// 功能：把世界 ENU 单位向量转换为导航仰角，正值表示向 Up。
+double worldEnuAltitudeDeg(const QVector3D& direction)
+{
+    const double z = std::max(-1.0, std::min(1.0, static_cast<double>(direction.normalized().z()))); return std::asin(z) * 180.0 / 3.14159265358979323846;
+}
 
 bool validNonNegative(double value)
 {
@@ -210,56 +246,29 @@ void CIEWidget::setupUI()
 	scaleLayout->addRow(tr("当前单位"), m_scaleUnitLabel);
 
 	parameterLayout->addWidget(scaleGroup);
-	// Camera.
-	QGroupBox* cameraGroup = new QGroupBox(tr("透视相机"));
+	// CIE Sky ENU：只定义天空模型在世界中的朝向，与 Viewer Camera 的位置/姿态严格分离。
+	QGroupBox* enuGroup = new QGroupBox(tr("CIE 天空 ENU"));
+	QFormLayout* enuLayout = new QFormLayout(enuGroup);
+	m_skyEastXSpin = makeCieEnuSpin(this, 1.0); m_skyEastYSpin = makeCieEnuSpin(this, 0.0); m_skyEastZSpin = makeCieEnuSpin(this, 0.0);
+	m_skyNorthXSpin = makeCieEnuSpin(this, 0.0); m_skyNorthYSpin = makeCieEnuSpin(this, 1.0); m_skyNorthZSpin = makeCieEnuSpin(this, 0.0);
+	m_skyUpXSpin = makeCieEnuSpin(this, 0.0); m_skyUpYSpin = makeCieEnuSpin(this, 0.0); m_skyUpZSpin = makeCieEnuSpin(this, 1.0);
+	enuLayout->addRow(tr("E (x,y,z)"), makeCieEnuRow(this, m_skyEastXSpin, m_skyEastYSpin, m_skyEastZSpin));
+	enuLayout->addRow(tr("N (x,y,z)"), makeCieEnuRow(this, m_skyNorthXSpin, m_skyNorthYSpin, m_skyNorthZSpin));
+	enuLayout->addRow(tr("U (x,y,z)"), makeCieEnuRow(this, m_skyUpXSpin, m_skyUpYSpin, m_skyUpZSpin));
+	parameterLayout->addWidget(enuGroup);
 
+	// Viewer Camera：与 Standard Sky 使用同一套 Local Camera、Xc/Yc/Zc、Yaw/Pitch/Roll 和 FOV 语义。
+	QGroupBox* cameraGroup = new QGroupBox(tr("Viewer Camera"));
 	QFormLayout* cameraLayout = new QFormLayout(cameraGroup);
-
-	m_cameraAzimuthSpin = new QDoubleSpinBox;
-	m_cameraAzimuthSpin->setRange(0.0, 359.9);
-	m_cameraAzimuthSpin->setDecimals(1);
-	m_cameraAzimuthSpin->setSingleStep(5.0);
-	m_cameraAzimuthSpin->setSuffix("°");
-	m_cameraAzimuthSpin->setValue(180.0);
-
-	m_cameraAltitudeSpin = new QDoubleSpinBox;
-	m_cameraAltitudeSpin->setRange(-89.0, 89.0);
-	m_cameraAltitudeSpin->setDecimals(1);
-	m_cameraAltitudeSpin->setSingleStep(5.0);
-	m_cameraAltitudeSpin->setSuffix("°");
-	m_cameraAltitudeSpin->setValue(20.0);
-
-	m_cameraRollSpin = new QDoubleSpinBox;
-	m_cameraRollSpin->setRange(-180.0, 180.0);
-	m_cameraRollSpin->setDecimals(1);
-	m_cameraRollSpin->setSingleStep(1.0);
-	m_cameraRollSpin->setSuffix("°");
-	m_cameraRollSpin->setValue(0.0);
-	m_cameraRollSpin->setToolTip(tr("沿观察方向看，正 Roll 为顺时针旋转"));
-
-	m_cameraHfovSpin = new QDoubleSpinBox;
-	m_cameraHfovSpin->setRange(10.0, 170.0);
-	m_cameraHfovSpin->setDecimals(1);
-	m_cameraHfovSpin->setSingleStep(1.0);
-	m_cameraHfovSpin->setSuffix("°");
-	m_cameraHfovSpin->setValue(90.0);
-
-	m_cameraFovSpin = new QDoubleSpinBox;
-	m_cameraFovSpin->setRange(10.0, 170.0);
-	m_cameraFovSpin->setDecimals(1);
-	m_cameraFovSpin->setSingleStep(5.0);
-	m_cameraFovSpin->setSuffix("°");
-	m_cameraFovSpin->setValue(90.0);
-
-	m_resetCameraButton = new QPushButton(tr("重置相机"));
-
-	cameraLayout->addRow(tr("观察方位 Az"), m_cameraAzimuthSpin);
-	cameraLayout->addRow(tr("观察仰角 Alt"), m_cameraAltitudeSpin);
-	cameraLayout->addRow(tr("横滚 Roll"), m_cameraRollSpin);
-	cameraLayout->addRow(tr("水平视场 HFOV"), m_cameraHfovSpin);
-	cameraLayout->addRow(tr("垂直视场 VFOV"), m_cameraFovSpin);
-	cameraLayout->addRow(m_resetCameraButton);
-
+	m_localCameraCheck = new QCheckBox(tr("Local Camera")); m_localCameraCheck->setChecked(true); m_localCameraCheck->setToolTip(tr("Checked: Xc/Yc/Zc local camera convention. Unchecked: ENU navigation camera, Az=0° North and 90° East."));
+	m_cameraXcSpin = makeViewerCameraPositionSpin(this, 0.0); m_cameraYcSpin = makeViewerCameraPositionSpin(this, 0.0); m_cameraZcSpin = makeViewerCameraPositionSpin(this, 0.0);
+	m_cameraXcSpin->setToolTip(tr("Finite viewer sky sphere radius is 1.0. Local Camera=true uses camera-local Xc/Yc/Zc translation; false uses ENU E/N/U translation. Translation changes the sphere hit direction, not the CIE sky model itself.")); m_cameraYcSpin->setToolTip(m_cameraXcSpin->toolTip()); m_cameraZcSpin->setToolTip(m_cameraXcSpin->toolTip());
+	m_cameraAzimuthSpin = makeViewerCameraAngleSpin(this, -180.0, 359.9, 0.0, 5.0); m_cameraAltitudeSpin = makeViewerCameraAngleSpin(this, -180.0, 180.0, 20.0, 5.0); m_cameraRollSpin = makeViewerCameraAngleSpin(this, -180.0, 180.0, 0.0, 1.0);
+	m_cameraHfovSpin = makeViewerCameraAngleSpin(this, 10.0, 170.0, 90.0, 1.0); m_cameraFovSpin = makeViewerCameraAngleSpin(this, 10.0, 170.0, 60.0, 1.0);
+	m_aimSunButton = new QPushButton(tr("Aim at Sun")); m_resetCameraButton = new QPushButton(tr("Reset Camera"));
+	QWidget* cameraButtons = new QWidget(cameraGroup); QHBoxLayout* cameraButtonLayout = new QHBoxLayout(cameraButtons); cameraButtonLayout->setContentsMargins(0, 0, 0, 0); cameraButtonLayout->addWidget(m_aimSunButton); cameraButtonLayout->addWidget(m_resetCameraButton);
+	cameraLayout->addRow(tr("Mode"), m_localCameraCheck); cameraLayout->addRow(tr("Xc"), m_cameraXcSpin); cameraLayout->addRow(tr("Yc"), m_cameraYcSpin); cameraLayout->addRow(tr("Zc"), m_cameraZcSpin);
+	cameraLayout->addRow(tr("Yaw / Azimuth"), m_cameraAzimuthSpin); cameraLayout->addRow(tr("Pitch / Altitude"), m_cameraAltitudeSpin); cameraLayout->addRow(tr("Roll"), m_cameraRollSpin); cameraLayout->addRow(tr("HFOV"), m_cameraHfovSpin); cameraLayout->addRow(tr("VFOV"), m_cameraFovSpin); cameraLayout->addRow(cameraButtons);
 	parameterLayout->addWidget(cameraGroup);
 
 	// EPW weather visual effects.
@@ -371,10 +380,11 @@ void CIEWidget::setupUI()
 	m_skyWidget = new SkyPolarWidget(m_viewTabs);
 
 	m_perspectiveWidget = new SkyPerspectiveWidget(m_viewTabs);
+	m_sceneWidget = new SkySceneWidget(m_viewTabs);
 
 	m_viewTabs->addTab(m_skyWidget, tr("天空半球分析"));
-
 	m_viewTabs->addTab(m_perspectiveWidget, tr("透视天空"));
+	m_viewTabs->addTab(m_sceneWidget, tr("3D Geometry"));
 
 	splitter->addWidget(parameterScroll);
 	splitter->addWidget(m_viewTabs);
@@ -417,11 +427,17 @@ void CIEWidget::setupUI()
 			});
 	};
 
+	connect(m_localCameraCheck, &QCheckBox::toggled, this, &CIEWidget::onPerspectiveControlsChanged);
+
 	connectPerspectiveSpin(m_cameraAzimuthSpin);
 	connectPerspectiveSpin(m_cameraAltitudeSpin);
 	connectPerspectiveSpin(m_cameraFovSpin);
 	connectPerspectiveSpin(m_cameraRollSpin);
 	connectPerspectiveSpin(m_cameraHfovSpin);
+	connectPerspectiveSpin(m_cameraXcSpin); connectPerspectiveSpin(m_cameraYcSpin); connectPerspectiveSpin(m_cameraZcSpin);
+	connectPerspectiveSpin(m_skyEastXSpin); connectPerspectiveSpin(m_skyEastYSpin); connectPerspectiveSpin(m_skyEastZSpin);
+	connectPerspectiveSpin(m_skyNorthXSpin); connectPerspectiveSpin(m_skyNorthYSpin); connectPerspectiveSpin(m_skyNorthZSpin);
+	connectPerspectiveSpin(m_skyUpXSpin); connectPerspectiveSpin(m_skyUpYSpin); connectPerspectiveSpin(m_skyUpZSpin);
 	connectPerspectiveSpin(m_targetValueSpin);
 	connectPerspectiveSpin(m_directNormalSpin);
 	connectPerspectiveSpin(m_referenceValueSpin);
@@ -451,6 +467,7 @@ void CIEWidget::setupUI()
 	connect(m_animateWeatherCheck, &QCheckBox::toggled, this, [this](bool) { onPerspectiveControlsChanged(); });
 	connect(m_showWeatherParticlesCheck, &QCheckBox::toggled, this, [this](bool) { onPerspectiveControlsChanged(); });
 	connect(m_showWeatherGroundCheck, &QCheckBox::toggled, this, [this](bool) { onPerspectiveControlsChanged(); });
+	connect(m_aimSunButton, &QPushButton::clicked, this, &CIEWidget::onAimAtSun);
 	connect(m_resetCameraButton, &QPushButton::clicked, this, &CIEWidget::onResetCamera);
 	connect(m_exportButton, &QPushButton::clicked, this, &CIEWidget::onExportPerspective);
 	connect(m_perspectiveWidget, &SkyPerspectiveWidget::cameraChanged, this, [this](
@@ -706,6 +723,17 @@ SkyPerspectiveParameters CIEWidget::currentPerspectiveParameters() const
 
 	parameters.sunDirection = currentSunDirection();
 
+	// Transform B：用户 ENU 定义 CIE 天空相对世界坐标的朝向，SkyPerspectiveWidget 内部会正交化后用于 World -> CIE Sky。
+	parameters.skyEastDirection = QVector3D(m_skyEastXSpin->value(), m_skyEastYSpin->value(), m_skyEastZSpin->value());
+	parameters.skyNorthDirection = QVector3D(m_skyNorthXSpin->value(), m_skyNorthYSpin->value(), m_skyNorthZSpin->value());
+	parameters.skyZenithDirection = QVector3D(m_skyUpXSpin->value(), m_skyUpYSpin->value(), m_skyUpZSpin->value());
+	parameters.cameraRelativeToSkyBasis = false;
+
+	// Transform A：透视相机在 World ENU 中独立移动；启用有限天空球后 Xc/Yc/Zc 会通过球面求交产生真实可视化视差。
+	parameters.cameraPositionLocal = QVector3D(m_cameraXcSpin->value(), m_cameraYcSpin->value(), m_cameraZcSpin->value());
+	parameters.localCamera = m_localCameraCheck->isChecked();
+	parameters.useFiniteSkySphere = true;
+	parameters.skySphereRadius = 1.0;
 	parameters.cameraAzimuthDeg = m_cameraAzimuthSpin->value();
 	parameters.cameraPitchDeg = m_cameraAltitudeSpin->value();
 	parameters.verticalFovDeg = m_cameraFovSpin->value();
@@ -742,6 +770,7 @@ void CIEWidget::updatePerspectiveView()
         return;
 
     m_perspectiveWidget->setParameters(currentPerspectiveParameters());
+    if (m_sceneWidget) m_sceneWidget->setSceneState(m_perspectiveWidget->sceneState());
 }
 
 void CIEWidget::updateScaleInputsFromCurrentRecord()
@@ -861,14 +890,21 @@ void CIEWidget::onScaleModeChanged()
     updatePerspectiveView();
 }
 
+// 功能：与 Standard Sky 的 Aim at Sun 一致，切换到 ENU 导航相机并把视线中心对准当前太阳。
+void CIEWidget::onAimAtSun()
+{
+    const QVector3D sun = currentSunDirection();
+    if (sun.lengthSquared() < 1.0e-12f)
+    {
+        return;
+    }
+    m_localCameraCheck->setChecked(false); m_cameraAzimuthSpin->setValue(worldEnuAzimuthDeg(sun)); m_cameraAltitudeSpin->setValue(std::max(-89.0, std::min(89.0, worldEnuAltitudeDeg(sun)))); m_cameraRollSpin->setValue(0.0); updatePerspectiveView();
+}
+
+// 功能：与 Standard Sky 的 Reset Camera 一致，只恢复相机位置、姿态和 FOV，不强制改变 Local Camera 模式。
 void CIEWidget::onResetCamera()
 {
-    m_cameraAzimuthSpin->setValue(180.0);
-    m_cameraAltitudeSpin->setValue(20.0);
-	m_cameraRollSpin->setValue(0.0);
-	m_cameraHfovSpin->setValue(90.0);
-    m_cameraFovSpin->setValue(90.0);
-    updatePerspectiveView();
+    m_cameraXcSpin->setValue(0.0); m_cameraYcSpin->setValue(0.0); m_cameraZcSpin->setValue(0.0); m_cameraAzimuthSpin->setValue(0.0); m_cameraAltitudeSpin->setValue(20.0); m_cameraRollSpin->setValue(0.0); m_cameraHfovSpin->setValue(90.0); m_cameraFovSpin->setValue(60.0); updatePerspectiveView();
 }
 
 void CIEWidget::onExportPerspective()

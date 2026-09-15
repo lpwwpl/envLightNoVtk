@@ -27,6 +27,7 @@ set(ENVLIGHT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/envLight)
 set(ENVLIGHT_SOURCES
     ${ENVLIGHT_DIR}/main.cpp
     ${ENVLIGHT_DIR}/mainwindow.cpp
+    ${ENVLIGHT_DIR}/StandardSkyViewer.cpp
     ${ENVLIGHT_DIR}/OpenGLSceneWidget.cpp
     ${ENVLIGHT_DIR}/panorama_processor.cpp
     ${ENVLIGHT_DIR}/CIEWidget.cpp
@@ -35,11 +36,14 @@ set(ENVLIGHT_SOURCES
     ${ENVLIGHT_DIR}/SunSky.cpp
     ${ENVLIGHT_DIR}/EpwReader.cpp
     ${ENVLIGHT_DIR}/WeatherEffects.cpp
+	    ${ENVLIGHT_DIR}/SkySceneWidget.cpp
     ${ENVLIGHT_DIR}/environment_light.cpp
 )
 
 set(ENVLIGHT_HEADERS
     ${ENVLIGHT_DIR}/mainwindow.h
+		    ${ENVLIGHT_DIR}/SkySceneWidget.h
+    ${ENVLIGHT_DIR}/StandardSkyViewer.h
     ${ENVLIGHT_DIR}/OpenGLSceneWidget.h
     ${ENVLIGHT_DIR}/CameraTransform.h
     ${ENVLIGHT_DIR}/panorama_processor.h

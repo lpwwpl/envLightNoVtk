@@ -1,4 +1,4 @@
-﻿#ifndef MAINWINDOW_H
+#ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
 #include <QMainWindow>
@@ -32,6 +32,7 @@ private slots:
     void onPerspectiveViewReady(const QImage& img);
     void createMenu();
     void showSkyViewer();
+    void showStandardSkyViewer();
 private:
     void setupUI();
     void setupConnections();

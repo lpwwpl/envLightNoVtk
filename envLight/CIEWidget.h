@@ -19,6 +19,7 @@ class QTabWidget;
 QT_END_NAMESPACE
 
 class SkyPolarWidget;
+class SkySceneWidget;
 
 class CIEWidget : public QMainWindow
 {
@@ -37,6 +38,7 @@ private slots:
     void onPerspectiveControlsChanged();
     void onScaleModeChanged();
     void onWeatherModeChanged();
+    void onAimAtSun();
     void onResetCamera();
     void onExportPerspective();
 
@@ -65,6 +67,7 @@ private:
 private:
     SkyPolarWidget* m_skyWidget = nullptr;
     SkyPerspectiveWidget* m_perspectiveWidget = nullptr;
+    SkySceneWidget* m_sceneWidget = nullptr;
     QTabWidget* m_viewTabs = nullptr;
 
     QComboBox* m_skyTypeCombo = nullptr;
@@ -79,11 +82,24 @@ private:
     QLabel* m_sliderInfo = nullptr;
     QLabel* m_locationInfo = nullptr;
 
+    QCheckBox* m_localCameraCheck = nullptr;
+    QDoubleSpinBox* m_cameraXcSpin = nullptr;
+    QDoubleSpinBox* m_cameraYcSpin = nullptr;
+    QDoubleSpinBox* m_cameraZcSpin = nullptr;
     QDoubleSpinBox* m_cameraAzimuthSpin = nullptr;
     QDoubleSpinBox* m_cameraAltitudeSpin = nullptr;
     QDoubleSpinBox* m_cameraFovSpin = nullptr;
 	QDoubleSpinBox* m_cameraRollSpin = nullptr;
 	QDoubleSpinBox* m_cameraHfovSpin = nullptr;
+    QDoubleSpinBox* m_skyEastXSpin = nullptr;
+    QDoubleSpinBox* m_skyEastYSpin = nullptr;
+    QDoubleSpinBox* m_skyEastZSpin = nullptr;
+    QDoubleSpinBox* m_skyNorthXSpin = nullptr;
+    QDoubleSpinBox* m_skyNorthYSpin = nullptr;
+    QDoubleSpinBox* m_skyNorthZSpin = nullptr;
+    QDoubleSpinBox* m_skyUpXSpin = nullptr;
+    QDoubleSpinBox* m_skyUpYSpin = nullptr;
+    QDoubleSpinBox* m_skyUpZSpin = nullptr;
 
     QComboBox* m_scaleModeCombo = nullptr;
     QDoubleSpinBox* m_targetValueSpin = nullptr;
@@ -106,6 +122,7 @@ private:
     QCheckBox* m_showWeatherGroundCheck = nullptr;
     QLabel* m_weatherStatusLabel = nullptr;
 
+    QPushButton* m_aimSunButton = nullptr;
     QPushButton* m_resetCameraButton = nullptr;
     QPushButton* m_exportButton = nullptr;
 
