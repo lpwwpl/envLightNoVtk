@@ -124,7 +124,7 @@ QString cityDisplayName(int index)
     {
         return QString();
     }
-    return QString::fromUtf8(kCityLocations[index].name) + QStringLiteral(", ") + QString::fromUtf8(kCityLocations[index].country);
+    return QString::fromUtf8(kCityLocations[index].name) + QString::fromUtf8(", ") + QString::fromUtf8(kCityLocations[index].country);
 }
 
 // 功能：把地图点击位置吸附到最近的内置城市，从而得到稳定的 IANA Zone、经纬度和 DST 规则。
@@ -676,7 +676,7 @@ void StandardSkyViewer::setupUi()
     m_timeZoneSpin->setKeyboardTracking(false);
     m_autoTimeZoneCheck = new QCheckBox(tr("Automatic from Zone (DST aware)"));
     m_autoTimeZoneCheck->setChecked(true);
-    m_timeZoneId = QStringLiteral("Europe/Paris");
+    m_timeZoneId = QString::fromUtf8("Europe/Paris");
     m_timeZoneIdLabel = new QLabel(m_timeZoneId);
     m_longitudeSpin = makeAngleSpin(-180.0, 180.0, 6.048889, 0.1);
     m_longitudeSpin->setDecimals(6);
@@ -1019,7 +1019,7 @@ void StandardSkyViewer::onExportPng()
             return;
         }
     }
-    QString path = QFileDialog::getSaveFileName(this, tr("Export CIE Standard Sky"), QStringLiteral("cie_standard_sky.png"), tr("PNG image (*.png)"));
+    QString path = QFileDialog::getSaveFileName(this, tr("Export CIE Standard Sky"), QString::fromUtf8("cie_standard_sky.png"), tr("PNG image (*.png)"));
     if (path.isEmpty())
     {
         return;
@@ -1310,16 +1310,16 @@ void StandardSkyViewer::updateSensorUiState()
     QString suffix;
     if (type == SkyMeasurementType::Photometric || type == SkyMeasurementType::Colorimetric)
     {
-        suffix = QStringLiteral(" cd/m²");
+        suffix = QString::fromUtf8(" cd/m²");
     }
     else if (type == SkyMeasurementType::Radiometric)
     {
-        suffix = QStringLiteral(" W/(m²·sr)");
+        suffix = QString::fromUtf8(" W/(m²·sr)");
     }
     else
     {
         const bool allWavelengths = m_displayWavelengthCombo->count() > 0 && m_displayWavelengthCombo->currentData().toDouble() < 0.0;
-        suffix = allWavelengths ? QStringLiteral(" cd/m²") : QStringLiteral(" W/(m²·sr·nm)");
+        suffix = allWavelengths ? QString::fromUtf8(" cd/m²") : QString::fromUtf8(" W/(m²·sr·nm)");
     }
     m_referenceLuminanceSpin->setSuffix(suffix);
 }

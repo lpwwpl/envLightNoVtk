@@ -211,16 +211,16 @@ QString measurementTypeText(SkyMeasurementType type)
 {
     switch (type) {
     case SkyMeasurementType::Photometric:
-        return QStringLiteral("Photometric [cd/m²]");
+        return QString::fromUtf8("Photometric [cd/m²]");
     case SkyMeasurementType::Radiometric:
-        return QStringLiteral("Radiometric [W/(m²·sr)]");
+        return QString::fromUtf8("Radiometric [W/(m²·sr)]");
     case SkyMeasurementType::Colorimetric:
-        return QStringLiteral("Colorimetric [XYZ/sRGB]");
+        return QString::fromUtf8("Colorimetric [XYZ/sRGB]");
     case SkyMeasurementType::Spectral:
-        return QStringLiteral("Spectral");
+        return QString::fromUtf8("Spectral");
     }
 
-    return QStringLiteral("Unknown");
+    return QString::fromUtf8("Unknown");
 }
 
 } // namespace

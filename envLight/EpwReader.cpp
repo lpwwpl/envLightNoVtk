@@ -198,7 +198,7 @@ bool EpwReader::read(
         record.presentWeatherCodes =
             fields[27].trimmed();
         if (record.presentWeatherCodes.size() < 9)
-            record.presentWeatherCodes = QStringLiteral("999999999");
+            record.presentWeatherCodes = QString::fromUtf8("999999999");
         else
             record.presentWeatherCodes =
                 record.presentWeatherCodes.left(9);

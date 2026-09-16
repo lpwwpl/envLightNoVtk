@@ -57,7 +57,7 @@ struct EpwRecord {
     // 0 = observation made; 9 = missing/not made.
     int presentWeatherObservation = 9;
     // Text field containing nine one-digit TMY2-style weather codes.
-    QString presentWeatherCodes = QStringLiteral("999999999");
+    QString presentWeatherCodes = QString::fromUtf8("999999999");
 
     double precipitableWater = epwNaN();
     double aerosolOpticalDepth = epwNaN();
