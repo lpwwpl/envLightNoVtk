@@ -723,7 +723,8 @@ void StandardSkyViewer::setupUi()
     m_layerCombo->addItem(tr("Diffuse sky only"), static_cast<int>(SkyMeasurementLayer::DiffuseSkyOnly));
     m_layerCombo->addItem(tr("Direct sun only"), static_cast<int>(SkyMeasurementLayer::DirectSunOnly));
     m_observerTypeCombo = new QComboBox;
-    m_observerTypeCombo->addItem(tr("CIE 1931 2°"), 0);
+    m_observerTypeCombo->addItem(tr("CIE 1931 2°"), static_cast<int>(SkyObserverType::CIE1931_2Deg));
+    m_observerTypeCombo->addItem(tr("CIE 1964 10°"), static_cast<int>(SkyObserverType::CIE1964_10Deg));
     m_outputWidthSpin = makeSamplingSpin(800);
     m_outputHeightSpin = makeSamplingSpin(600);
     sensorForm->addRow(tr("General Type"), m_sensorTypeCombo);
@@ -748,7 +749,9 @@ void StandardSkyViewer::setupUi()
     m_wavelengthSamplingSpin = new QSpinBox;
     m_wavelengthSamplingSpin->setRange(3, 401);
     m_wavelengthSamplingSpin->setValue(13);
+    m_wavelengthSamplingSpin->setToolTip(tr("Number of uniformly spaced wavelength planes offered by Spectral mode. Band integration itself is evaluated at 1 nm resolution."));
     m_displayWavelengthCombo = new QComboBox;
+    m_displayWavelengthCombo->setToolTip(tr("Spectral mode: choose the integrated band colorimetric result or one wavelength plane."));
     m_spectralTemperatureSpin = new QDoubleSpinBox;
     m_spectralTemperatureSpin->setRange(1000.0, 20000.0);
     m_spectralTemperatureSpin->setDecimals(0);
@@ -756,7 +759,7 @@ void StandardSkyViewer::setupUi()
     m_spectralTemperatureSpin->setValue(6500.0);
     wavelengthLayout->addRow(tr("Start"), m_wavelengthStartSpin);
     wavelengthLayout->addRow(tr("End"), m_wavelengthEndSpin);
-    wavelengthLayout->addRow(tr("Sampling"), m_wavelengthSamplingSpin);
+    wavelengthLayout->addRow(tr("Spectral planes"), m_wavelengthSamplingSpin);
     wavelengthLayout->addRow(tr("Display wavelength"), m_displayWavelengthCombo);
     wavelengthLayout->addRow(tr("Spectral temperature"), m_spectralTemperatureSpin);
     sensorLayout->addWidget(wavelengthGroup);
@@ -888,6 +891,7 @@ void StandardSkyViewer::setupUi()
     connectRenderSpin(m_manualSunAltitudeSpin);
     connectRenderSpin(m_directNormalIlluminanceSpin);
     connectRenderCombo(m_layerCombo);
+    connectRenderCombo(m_observerTypeCombo);
     connectRenderIntSpin(m_outputWidthSpin);
     connectRenderIntSpin(m_outputHeightSpin);
     connectRenderSpin(m_spectralTemperatureSpin);
@@ -1134,6 +1138,7 @@ SkyPerspectiveParameters StandardSkyViewer::currentParameters() const
 
     p.measurementType = static_cast<SkyMeasurementType>(m_sensorTypeCombo->currentData().toInt());
     p.measurementLayer = static_cast<SkyMeasurementLayer>(m_layerCombo->currentData().toInt());
+    p.observerType = static_cast<SkyObserverType>(m_observerTypeCombo->currentData().toInt());
     p.spectralStartNm = m_wavelengthStartSpin->value();
     p.spectralEndNm = m_wavelengthEndSpin->value();
     p.spectralSampling = m_wavelengthSamplingSpin->value();
@@ -1357,7 +1362,7 @@ void StandardSkyViewer::rebuildWavelengthList()
     }
     QSignalBlocker blocker(m_displayWavelengthCombo);
     m_displayWavelengthCombo->clear();
-    m_displayWavelengthCombo->addItem(tr("All wavelengths (True Color)"), -1.0);
+    m_displayWavelengthCombo->addItem(tr("Integrated band (colorimetric)"), -1.0);
     int nearestIndex = 1;
     double nearestDistance = std::numeric_limits<double>::max();
     for (int i = 0; i < count; ++i)

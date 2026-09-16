@@ -35,6 +35,23 @@ double asymmetricGaussian(double wavelengthNm, double centerNm, double leftSlope
     return std::exp(-0.5 * t * t);
 }
 
+
+// Spectral display: CIE 1931 visible range.
+// UV and IR can still be calculated physically, but cannot be mapped to sRGB.
+bool isVisibleWavelength(double wavelengthNm)
+{
+    return wavelengthNm >= 360.0 && wavelengthNm <= 830.0;
+}
+
+double naturalAutoExposure(double value, double peakValue)
+{
+    if (value <= 0.0 || peakValue <= 0.0)
+        return 0.0;
+
+    const double normalized = value / peakValue;
+    return normalized / (1.0 + normalized);
+}
+
 // CIE 1931 XYZ 颜色匹配函数只用于把“已有的天空亮度”转换为颜色/光谱显示，
 // 它与 CIE Standard General Sky 的 15 类天空分布不是同一个模型，不能混为一谈。
 // 功能：返回 CIE 1931 2° x-bar 的解析近似值。
@@ -53,6 +70,132 @@ double cieYBar1931(double wavelengthNm)
 double cieZBar1931(double wavelengthNm)
 {
     return 1.217 * asymmetricGaussian(wavelengthNm, 437.0, 0.0845, 0.0278) + 0.681 * asymmetricGaussian(wavelengthNm, 459.0, 0.0385, 0.0725);
+}
+
+// CIE 1964 10° supplementary standard observer.
+// The table below uses the CIE 5 nm abridged values from 380-780 nm and
+// linearly interpolates between tabulated wavelengths. Outside the abridged
+// range the CMFs are treated as zero for display/integration purposes.
+struct CieCmfSample { double wavelengthNm; double x; double y; double z; };
+
+static const CieCmfSample kCie1964_10Deg[] = {
+    {380.0, 0.000160, 0.000017, 0.000705},
+    {385.0, 0.000662, 0.000072, 0.002928},
+    {390.0, 0.002362, 0.000253, 0.010482},
+    {395.0, 0.007242, 0.000769, 0.032344},
+    {400.0, 0.019110, 0.002004, 0.086011},
+    {405.0, 0.043400, 0.004509, 0.197120},
+    {410.0, 0.084736, 0.008756, 0.389366},
+    {415.0, 0.140638, 0.014456, 0.656760},
+    {420.0, 0.204492, 0.021391, 0.972542},
+    {425.0, 0.264737, 0.029497, 1.282500},
+    {430.0, 0.314679, 0.038676, 1.553480},
+    {435.0, 0.357719, 0.049602, 1.798500},
+    {440.0, 0.383734, 0.062077, 1.967280},
+    {445.0, 0.386726, 0.074704, 2.027300},
+    {450.0, 0.370702, 0.089456, 1.994800},
+    {455.0, 0.342957, 0.106256, 1.900700},
+    {460.0, 0.302273, 0.128201, 1.745370},
+    {465.0, 0.254085, 0.152761, 1.554900},
+    {470.0, 0.195618, 0.185190, 1.317560},
+    {475.0, 0.132349, 0.219940, 1.030200},
+    {480.0, 0.080507, 0.253589, 0.772125},
+    {485.0, 0.041072, 0.297665, 0.570060},
+    {490.0, 0.016172, 0.339133, 0.415254},
+    {495.0, 0.005132, 0.395379, 0.302356},
+    {500.0, 0.003816, 0.460777, 0.218502},
+    {505.0, 0.015444, 0.531360, 0.159249},
+    {510.0, 0.037465, 0.606741, 0.112044},
+    {515.0, 0.071358, 0.685660, 0.082248},
+    {520.0, 0.117749, 0.761757, 0.060709},
+    {525.0, 0.172953, 0.823330, 0.043050},
+    {530.0, 0.236491, 0.875211, 0.030451},
+    {535.0, 0.304213, 0.923810, 0.020584},
+    {540.0, 0.376772, 0.961988, 0.013676},
+    {545.0, 0.451584, 0.982200, 0.007918},
+    {550.0, 0.529826, 0.991761, 0.003988},
+    {555.0, 0.616053, 0.999110, 0.001091},
+    {560.0, 0.705224, 0.997340, 0.000000},
+    {565.0, 0.793832, 0.982380, 0.000000},
+    {570.0, 0.878655, 0.955552, 0.000000},
+    {575.0, 0.951162, 0.915175, 0.000000},
+    {580.0, 1.014160, 0.868934, 0.000000},
+    {585.0, 1.074300, 0.825623, 0.000000},
+    {590.0, 1.118520, 0.777405, 0.000000},
+    {595.0, 1.134300, 0.720353, 0.000000},
+    {600.0, 1.123990, 0.658341, 0.000000},
+    {605.0, 1.089100, 0.593878, 0.000000},
+    {610.0, 1.030480, 0.527963, 0.000000},
+    {615.0, 0.950740, 0.461834, 0.000000},
+    {620.0, 0.856297, 0.398057, 0.000000},
+    {625.0, 0.754930, 0.339554, 0.000000},
+    {630.0, 0.647467, 0.283493, 0.000000},
+    {635.0, 0.535110, 0.228254, 0.000000},
+    {640.0, 0.431567, 0.179828, 0.000000},
+    {645.0, 0.343690, 0.140211, 0.000000},
+    {650.0, 0.268329, 0.107633, 0.000000},
+    {655.0, 0.204300, 0.081187, 0.000000},
+    {660.0, 0.152568, 0.060281, 0.000000},
+    {665.0, 0.112210, 0.044096, 0.000000},
+    {670.0, 0.081261, 0.031800, 0.000000},
+    {675.0, 0.057930, 0.022602, 0.000000},
+    {680.0, 0.040851, 0.015905, 0.000000},
+    {685.0, 0.028623, 0.011130, 0.000000},
+    {690.0, 0.019941, 0.007749, 0.000000},
+    {695.0, 0.013842, 0.005375, 0.000000},
+    {700.0, 0.009577, 0.003718, 0.000000},
+    {705.0, 0.006605, 0.002565, 0.000000},
+    {710.0, 0.004553, 0.001768, 0.000000},
+    {715.0, 0.003145, 0.001222, 0.000000},
+    {720.0, 0.002175, 0.000846, 0.000000},
+    {725.0, 0.001506, 0.000586, 0.000000},
+    {730.0, 0.001045, 0.000407, 0.000000},
+    {735.0, 0.000727, 0.000284, 0.000000},
+    {740.0, 0.000508, 0.000199, 0.000000},
+    {745.0, 0.000356, 0.000140, 0.000000},
+    {750.0, 0.000251, 0.000098, 0.000000},
+    {755.0, 0.000178, 0.000070, 0.000000},
+    {760.0, 0.000126, 0.000050, 0.000000},
+    {765.0, 0.000090, 0.000036, 0.000000},
+    {770.0, 0.000065, 0.000025, 0.000000},
+    {775.0, 0.000046, 0.000018, 0.000000},
+    {780.0, 0.000033, 0.000013, 0.000000},
+};
+
+QVector3D cieXYZBar1964(double wavelengthNm)
+{
+    constexpr int count = static_cast<int>(sizeof(kCie1964_10Deg) / sizeof(kCie1964_10Deg[0]));
+    if (wavelengthNm < kCie1964_10Deg[0].wavelengthNm || wavelengthNm > kCie1964_10Deg[count - 1].wavelengthNm)
+        return QVector3D(0.0f, 0.0f, 0.0f);
+
+    const double position = (wavelengthNm - 380.0) / 5.0;
+    const int i0 = std::max(0, std::min(count - 1, static_cast<int>(std::floor(position))));
+    const int i1 = std::min(count - 1, i0 + 1);
+    if (i0 == i1)
+        return QVector3D(static_cast<float>(kCie1964_10Deg[i0].x), static_cast<float>(kCie1964_10Deg[i0].y), static_cast<float>(kCie1964_10Deg[i0].z));
+
+    const double t = std::max(0.0, std::min(1.0, position - static_cast<double>(i0)));
+    const auto& a = kCie1964_10Deg[i0];
+    const auto& b = kCie1964_10Deg[i1];
+    return QVector3D(
+        static_cast<float>(a.x + (b.x - a.x) * t),
+        static_cast<float>(a.y + (b.y - a.y) * t),
+        static_cast<float>(a.z + (b.z - a.z) * t));
+}
+
+double cieXBar(double wavelengthNm, SkyObserverType observer)
+{
+    return observer == SkyObserverType::CIE1964_10Deg ? cieXYZBar1964(wavelengthNm).x() : cieXBar1931(wavelengthNm);
+}
+
+double cieYBar(double wavelengthNm, SkyObserverType observer)
+{
+    return observer == SkyObserverType::CIE1964_10Deg ? cieXYZBar1964(wavelengthNm).y() : cieYBar1931(wavelengthNm);
+}
+
+double cieZBar(double wavelengthNm, SkyObserverType observer)
+{
+    return observer == SkyObserverType::CIE1964_10Deg ? cieXYZBar1964(wavelengthNm).z() : cieZBar1931(wavelengthNm);
 }
 
 // 功能：返回以 555 nm 为相对参考的 Planck 光谱形状，避免绝对黑体辐射数值过大。
@@ -107,6 +250,8 @@ SpectralConversion buildSpectralConversion(const SkyPerspectiveParameters& param
 {
     SpectralConversion result;
 
+    // 输入天空亮度是传统 photometric cd/m²，因此 W<->luminance 标定始终使用 CIE 1931 V(λ)=y-bar。
+    // Observer 只改变随后计算的 XYZ/色度，不应让 Radiometric/Spectral 的物理瓦特值随观察者切换。
     double fullVisibleY = 0.0;
     for (int wavelength = 360; wavelength <= 830; ++wavelength)
     {
@@ -134,9 +279,9 @@ SpectralConversion buildSpectralConversion(const SkyPerspectiveParameters& param
 
         const double spectralPower = planckRelative(wavelength, parameters.spectralTemperatureK);
         bandPower += spectralPower;
-        bandX += spectralPower * cieXBar1931(wavelength);
-        bandY += spectralPower * cieYBar1931(wavelength);
-        bandZ += spectralPower * cieZBar1931(wavelength);
+        bandX += spectralPower * cieXBar(wavelength, parameters.observerType);
+        bandY += spectralPower * cieYBar(wavelength, parameters.observerType);
+        bandZ += spectralPower * cieZBar(wavelength, parameters.observerType);
     }
 
     result.bandRadiancePerLuminance = bandPower / photometricDenominator;
@@ -148,7 +293,17 @@ SpectralConversion buildSpectralConversion(const SkyPerspectiveParameters& param
 
     result.colorimetricRgb = normalizedLinearSrgbFromXyz(bandX / std::max(1.0e-18, fullVisibleY), bandY / std::max(1.0e-18, fullVisibleY), bandZ / std::max(1.0e-18, fullVisibleY));
 
-    result.wavelengthRgb = normalizedLinearSrgbFromXyz(cieXBar1931(selectedWavelength), cieYBar1931(selectedWavelength), cieZBar1931(selectedWavelength));
+    if (isVisibleWavelength(selectedWavelength))
+    {
+        result.wavelengthRgb = normalizedLinearSrgbFromXyz(
+            cieXBar(selectedWavelength, parameters.observerType),
+            cieYBar(selectedWavelength, parameters.observerType),
+            cieZBar(selectedWavelength, parameters.observerType));
+    }
+    else
+    {
+        result.wavelengthRgb = QVector3D(0.0f, 0.0f, 0.0f);
+    }
 
     return result;
 }
@@ -215,7 +370,7 @@ QString measurementTypeText(SkyMeasurementType type)
     case SkyMeasurementType::Radiometric:
         return QString::fromUtf8("Radiometric [W/(m²·sr)]");
     case SkyMeasurementType::Colorimetric:
-        return QString::fromUtf8("Colorimetric [XYZ/sRGB]");
+        return QString::fromUtf8("Colorimetric Y / chromaticity");
     case SkyMeasurementType::Spectral:
         return QString::fromUtf8("Spectral");
     }
@@ -932,7 +1087,7 @@ QImage SkyPerspectiveWidget::renderBaseImage(const QSize& imageSize) const
 
             const double value = samples[y * width + x];
             const double normalized = toneMappedValue(value, referenceValue);
-            const double previewNormalized = toneMappedValue(previewDiffuseSamples[y * width + x], previewReferenceValue);
+            const double previewNormalized = naturalAutoExposure(previewDiffuseSamples[y * width + x], std::max(1.0e-12, previewDiffusePeak));
             const double sunCosine = QVector3D::dotProduct(direction, sun);
 
             QColor color;
@@ -942,12 +1097,29 @@ QImage SkyPerspectiveWidget::renderBaseImage(const QSize& imageSize) const
                 color = falseColor(normalized);
                 break;
             case SkyColorMode::NaturalPreview:
-                // Natural Preview 是几何/视觉辅助层，不再由 Measurement Layer 把背景清零；Sensor 类型和 Layer 仍保留在 samples 中供数值显示逻辑使用。
-                color = naturalPreviewColor(direction, previewNormalized, sunCosine, directStrength);
-                if (previewSunDisk && sunCosine >= cosSunRadius)
+                // Colorimetric/Spectral 模式显示传感器本身的色度：
+                // - Colorimetric：对 Start..End 波段积分后的 XYZ -> sRGB 色度；
+                // - Spectral 单波长：该波长的 CIE 1931 XYZ -> sRGB 色度；
+                // - Spectral integrated band：使用波段积分色度。
+                // Photometric/Radiometric 仍使用原自然天空预览。
+                if (m_parameters.measurementType == SkyMeasurementType::Colorimetric ||
+                    m_parameters.measurementType == SkyMeasurementType::Spectral)
                 {
-                    const double warm = clamp(0.90 + 0.10 * directStrength, 0.0, 1.0);
-                    color = QColor::fromRgbF(warm, warm * 0.97, warm * 0.86);
+                    const QVector3D sensorRgb =
+                        (m_parameters.measurementType == SkyMeasurementType::Spectral && !m_parameters.spectralDisplayAllWavelengths)
+                            ? spectral.wavelengthRgb
+                            : spectral.colorimetricRgb;
+                    color = chromaticDisplayColor(sensorRgb, normalized);
+                }
+                else
+                {
+                    // Natural Preview 是几何/视觉辅助层，不再由 Measurement Layer 把背景清零；Sensor 类型和 Layer 仍保留在 samples 中供数值显示逻辑使用。
+                    color = naturalPreviewColor(direction, previewNormalized, sunCosine, directStrength);
+                    if (previewSunDisk && sunCosine >= cosSunRadius)
+                    {
+                        const double warm = clamp(0.90 + 0.10 * directStrength, 0.0, 1.0);
+                        color = QColor::fromRgbF(warm, warm * 0.97, warm * 0.86);
+                    }
                 }
                 break;
             case SkyColorMode::GrayscaleLuminance:

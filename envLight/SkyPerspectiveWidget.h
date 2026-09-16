@@ -70,6 +70,14 @@ enum class SkyMeasurementLayer {
 };
 
 // ================================================================
+// CIE 标准色度观察者
+// ================================================================
+enum class SkyObserverType {
+    CIE1931_2Deg = 0,
+    CIE1964_10Deg = 1
+};
+
+// ================================================================
 // CIE Sky 透视渲染参数
 // 数值链路保持“相对天空分布 -> 绝对标定 -> 太阳盘 -> 传感器/显示”四层分离：
 // 1) cieSkyType/coefficients 决定 CIE 天空形状；
@@ -128,6 +136,7 @@ struct SkyPerspectiveParameters {
 
     SkyMeasurementType measurementType = SkyMeasurementType::Photometric;
     SkyMeasurementLayer measurementLayer = SkyMeasurementLayer::Combined;
+    SkyObserverType observerType = SkyObserverType::CIE1931_2Deg;
 
     // CIE Standard General Sky 只定义亮度分布，不定义 SPD；这里使用归一化 Planck 形状做转换。
     double spectralTemperatureK = 6500.0;
