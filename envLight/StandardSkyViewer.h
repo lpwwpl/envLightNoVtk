@@ -52,6 +52,12 @@ private slots:
     // 功能：根据传感器类型更新光谱控件与显示参考值单位。
     void onSensorTypeChanged();
 
+    // 功能：同步 Speos 风格 Focal/Observer 几何、采样、分辨率和 Viewer Camera FOV。
+    void onSensorGeometryChanged();
+
+    // 功能：Focal 模式下保持当前角中心不变，由 HFOV/VFOV 反算物理 X/Y 范围。
+    void onSensorFovChanged();
+
     // 功能：处理光谱范围和采样数变化并重建波长列表。
     void onWavelengthChanged();
 
@@ -113,6 +119,9 @@ private:
     // 功能：根据传感器类型更新光谱控件与 Tone Mapping 参考值单位。
     void updateSensorUiState();
 
+    // 功能：根据 Focal Frame 的 X/Y 尺寸计算派生 HFOV/VFOV，并同步输出采样。
+    void updateSensorGeometryUi();
+
     // 功能：根据输出尺寸和波长状态更新导出按钮文字。
     void updateExportButtonText();
 
@@ -170,6 +179,18 @@ private:
     QComboBox* m_sensorTypeCombo = nullptr;
     QComboBox* m_layerCombo = nullptr;
     QComboBox* m_observerTypeCombo = nullptr;
+    QComboBox* m_sensorObserverTypeCombo = nullptr;
+    QDoubleSpinBox* m_sensorFocalSpin = nullptr;
+    QDoubleSpinBox* m_sensorXStartSpin = nullptr;
+    QDoubleSpinBox* m_sensorXEndSpin = nullptr;
+    QSpinBox* m_sensorXSamplingSpin = nullptr;
+    QDoubleSpinBox* m_sensorXResolutionSpin = nullptr;
+    QCheckBox* m_sensorXMirrorCheck = nullptr;
+    QDoubleSpinBox* m_sensorYStartSpin = nullptr;
+    QDoubleSpinBox* m_sensorYEndSpin = nullptr;
+    QSpinBox* m_sensorYSamplingSpin = nullptr;
+    QDoubleSpinBox* m_sensorYResolutionSpin = nullptr;
+    QCheckBox* m_sensorYMirrorCheck = nullptr;
     QSpinBox* m_outputWidthSpin = nullptr;
     QSpinBox* m_outputHeightSpin = nullptr;
 

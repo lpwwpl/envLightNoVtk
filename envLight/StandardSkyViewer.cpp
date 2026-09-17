@@ -3,6 +3,7 @@
 #include "SunSky.hpp"
 #include "SkySceneWidget.h"
 #include "environment_light.h"
+#include "CameraTransform.h"
 
 #include <QAbstractItemView>
 #include <QAbstractSpinBox>
@@ -725,14 +726,98 @@ void StandardSkyViewer::setupUi()
     m_observerTypeCombo = new QComboBox;
     m_observerTypeCombo->addItem(tr("CIE 1931 2°"), static_cast<int>(SkyObserverType::CIE1931_2Deg));
     m_observerTypeCombo->addItem(tr("CIE 1964 10°"), static_cast<int>(SkyObserverType::CIE1964_10Deg));
-    m_outputWidthSpin = makeSamplingSpin(800);
-    m_outputHeightSpin = makeSamplingSpin(600);
+    m_observerTypeCombo->setToolTip(tr("Colorimetric standard observer. This is different from Speos Radiance Sensor Observer Type."));
+    m_sensorObserverTypeCombo = new QComboBox;
+    m_sensorObserverTypeCombo->addItem(tr("Focal (local frame)"), 0);
+    m_sensorObserverTypeCombo->addItem(tr("Observer (angular FOV)"), 1);
+    m_sensorObserverTypeCombo->setToolTip(tr("Speos-style geometry: Focal uses a physical X/Y sensor frame plus focal distance; Observer uses angular HFOV/VFOV."));
+    m_outputWidthSpin = makeSamplingSpin(2000);
+    m_outputHeightSpin = makeSamplingSpin(2000);
+    m_outputWidthSpin->setParent(sensorGroup);
+    m_outputHeightSpin->setParent(sensorGroup);
+    m_outputWidthSpin->setVisible(false);
+    m_outputHeightSpin->setVisible(false);
     sensorForm->addRow(tr("General Type"), m_sensorTypeCombo);
     sensorForm->addRow(tr("Layer"), m_layerCombo);
-    sensorForm->addRow(tr("Observer"), m_observerTypeCombo);
-    sensorForm->addRow(tr("Output width"), m_outputWidthSpin);
-    sensorForm->addRow(tr("Output height"), m_outputHeightSpin);
+    sensorForm->addRow(tr("Color observer"), m_observerTypeCombo);
+    sensorForm->addRow(tr("Sensor observer type"), m_sensorObserverTypeCombo);
     sensorLayout->addWidget(sensorGroup);
+
+    QGroupBox* sensorGeometryGroup = new QGroupBox(tr("Sensor Geometry"));
+    QFormLayout* sensorGeometryForm = new QFormLayout(sensorGeometryGroup);
+    m_sensorFocalSpin = new QDoubleSpinBox;
+    m_sensorFocalSpin->setRange(0.001, 1000000.0);
+    m_sensorFocalSpin->setDecimals(3);
+    m_sensorFocalSpin->setSuffix(" mm");
+    m_sensorFocalSpin->setValue(50.0);
+    m_sensorFocalSpin->setKeyboardTracking(false);
+    m_sensorFocalSpin->setToolTip(tr("Distance from the sensor plane to the observer/projection point in Focal mode."));
+    sensorGeometryForm->addRow(tr("Focal"), m_sensorFocalSpin);
+
+    QGroupBox* xDimensionsGroup = new QGroupBox(tr("X dimensions"));
+    QFormLayout* xDimensionsForm = new QFormLayout(xDimensionsGroup);
+    m_sensorXStartSpin = new QDoubleSpinBox;
+    m_sensorXStartSpin->setRange(-1000000.0, 1000000.0);
+    m_sensorXStartSpin->setDecimals(4);
+    m_sensorXStartSpin->setSuffix(" mm");
+    m_sensorXStartSpin->setValue(-50.0);
+    m_sensorXStartSpin->setKeyboardTracking(false);
+    m_sensorXEndSpin = new QDoubleSpinBox;
+    m_sensorXEndSpin->setRange(-1000000.0, 1000000.0);
+    m_sensorXEndSpin->setDecimals(4);
+    m_sensorXEndSpin->setSuffix(" mm");
+    m_sensorXEndSpin->setValue(50.0);
+    m_sensorXEndSpin->setKeyboardTracking(false);
+    m_sensorXSamplingSpin = makeSamplingSpin(2000);
+    m_sensorXSamplingSpin->setRange(1, 23170);
+    m_sensorXResolutionSpin = new QDoubleSpinBox;
+    m_sensorXResolutionSpin->setRange(0.0, 1000000.0);
+    m_sensorXResolutionSpin->setDecimals(6);
+    m_sensorXResolutionSpin->setSuffix(" mm");
+    m_sensorXResolutionSpin->setReadOnly(true);
+    m_sensorXResolutionSpin->setButtonSymbols(QAbstractSpinBox::NoButtons);
+    xDimensionsForm->addRow(tr("Start"), m_sensorXStartSpin);
+    xDimensionsForm->addRow(tr("End"), m_sensorXEndSpin);
+    m_sensorXMirrorCheck = new QCheckBox(tr("Mirror X sampling"));
+    m_sensorXMirrorCheck->setChecked(false);
+    m_sensorXMirrorCheck->setToolTip(tr("Reverse X sampling direction without changing the physical Start/End range."));
+    xDimensionsForm->addRow(tr("Mirror"), m_sensorXMirrorCheck);
+    xDimensionsForm->addRow(tr("Sampling"), m_sensorXSamplingSpin);
+    xDimensionsForm->addRow(tr("Resolution"), m_sensorXResolutionSpin);
+    sensorLayout->addWidget(sensorGeometryGroup);
+    sensorLayout->addWidget(xDimensionsGroup);
+
+    QGroupBox* yDimensionsGroup = new QGroupBox(tr("Y dimensions"));
+    QFormLayout* yDimensionsForm = new QFormLayout(yDimensionsGroup);
+    m_sensorYStartSpin = new QDoubleSpinBox;
+    m_sensorYStartSpin->setRange(-1000000.0, 1000000.0);
+    m_sensorYStartSpin->setDecimals(4);
+    m_sensorYStartSpin->setSuffix(" mm");
+    m_sensorYStartSpin->setValue(-50.0);
+    m_sensorYStartSpin->setKeyboardTracking(false);
+    m_sensorYEndSpin = new QDoubleSpinBox;
+    m_sensorYEndSpin->setRange(-1000000.0, 1000000.0);
+    m_sensorYEndSpin->setDecimals(4);
+    m_sensorYEndSpin->setSuffix(" mm");
+    m_sensorYEndSpin->setValue(50.0);
+    m_sensorYEndSpin->setKeyboardTracking(false);
+    m_sensorYSamplingSpin = makeSamplingSpin(2000);
+    m_sensorYSamplingSpin->setRange(1, 23170);
+    m_sensorYResolutionSpin = new QDoubleSpinBox;
+    m_sensorYResolutionSpin->setRange(0.0, 1000000.0);
+    m_sensorYResolutionSpin->setDecimals(6);
+    m_sensorYResolutionSpin->setSuffix(" mm");
+    m_sensorYResolutionSpin->setReadOnly(true);
+    m_sensorYResolutionSpin->setButtonSymbols(QAbstractSpinBox::NoButtons);
+    yDimensionsForm->addRow(tr("Start"), m_sensorYStartSpin);
+    yDimensionsForm->addRow(tr("End"), m_sensorYEndSpin);
+    m_sensorYMirrorCheck = new QCheckBox(tr("Mirror Y sampling"));
+    m_sensorYMirrorCheck->setChecked(false);
+    m_sensorYMirrorCheck->setToolTip(tr("Reverse Y sampling direction without changing the physical Start/End range."));
+    yDimensionsForm->addRow(tr("Mirror"), m_sensorYMirrorCheck);
+    yDimensionsForm->addRow(tr("Sampling"), m_sensorYSamplingSpin);
+    yDimensionsForm->addRow(tr("Resolution"), m_sensorYResolutionSpin);
+    sensorLayout->addWidget(yDimensionsGroup);
 
     QGroupBox* wavelengthGroup = new QGroupBox(tr("Wavelength"));
     QFormLayout* wavelengthLayout = new QFormLayout(wavelengthGroup);
@@ -779,8 +864,8 @@ void StandardSkyViewer::setupUi()
     m_cameraAzimuthSpin = makeAngleSpin(-180.0, 359.9, 0.0, 5.0);
     m_cameraAltitudeSpin = makeAngleSpin(-180.0, 180.0, 20.0, 5.0);
     m_cameraRollSpin = makeAngleSpin(-180.0, 180.0, 0.0, 1.0);
-    m_cameraHfovSpin = makeAngleSpin(10.0, 170.0, 90.0, 1.0);
-    m_cameraVfovSpin = makeAngleSpin(10.0, 170.0, 60.0, 1.0);
+    m_cameraHfovSpin = makeAngleSpin(0.1, 179.9, 90.0, 1.0);
+    m_cameraVfovSpin = makeAngleSpin(0.1, 179.9, 60.0, 1.0);
     m_aimSunButton = new QPushButton(tr("Aim at Sun"));
     m_resetViewButton = new QPushButton(tr("Reset Camera"));
     QWidget* cameraButtons = new QWidget(cameraGroup);
@@ -864,6 +949,16 @@ void StandardSkyViewer::setupUi()
     connect(m_autoTimeZoneCheck, &QCheckBox::toggled, this, &StandardSkyViewer::onAutoTimeZoneToggled);
     connect(m_dateTimeEdit, &QDateTimeEdit::dateTimeChanged, this, &StandardSkyViewer::onDateTimeChanged);
     connect(m_sensorTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &StandardSkyViewer::onSensorTypeChanged);
+    connect(m_sensorObserverTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &StandardSkyViewer::onSensorGeometryChanged);
+    connect(m_sensorFocalSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &StandardSkyViewer::onSensorGeometryChanged);
+    connect(m_sensorXStartSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &StandardSkyViewer::onSensorGeometryChanged);
+    connect(m_sensorXEndSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &StandardSkyViewer::onSensorGeometryChanged);
+    connect(m_sensorXSamplingSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, &StandardSkyViewer::onSensorGeometryChanged);
+    connect(m_sensorXMirrorCheck, &QCheckBox::toggled, this, &StandardSkyViewer::onSensorGeometryChanged);
+    connect(m_sensorYStartSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &StandardSkyViewer::onSensorGeometryChanged);
+    connect(m_sensorYEndSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &StandardSkyViewer::onSensorGeometryChanged);
+    connect(m_sensorYSamplingSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, &StandardSkyViewer::onSensorGeometryChanged);
+    connect(m_sensorYMirrorCheck, &QCheckBox::toggled, this, &StandardSkyViewer::onSensorGeometryChanged);
     connect(m_wavelengthStartSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &StandardSkyViewer::onWavelengthChanged);
     connect(m_wavelengthEndSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &StandardSkyViewer::onWavelengthChanged);
     connect(m_wavelengthSamplingSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, &StandardSkyViewer::onWavelengthChanged);
@@ -892,8 +987,6 @@ void StandardSkyViewer::setupUi()
     connectRenderSpin(m_directNormalIlluminanceSpin);
     connectRenderCombo(m_layerCombo);
     connectRenderCombo(m_observerTypeCombo);
-    connectRenderIntSpin(m_outputWidthSpin);
-    connectRenderIntSpin(m_outputHeightSpin);
     connectRenderSpin(m_spectralTemperatureSpin);
     connectRenderCheck(m_localCameraCheck);
     connectRenderSpin(m_cameraXcSpin);
@@ -902,8 +995,8 @@ void StandardSkyViewer::setupUi()
     connectRenderSpin(m_cameraAzimuthSpin);
     connectRenderSpin(m_cameraAltitudeSpin);
     connectRenderSpin(m_cameraRollSpin);
-    connectRenderSpin(m_cameraHfovSpin);
-    connectRenderSpin(m_cameraVfovSpin);
+    connect(m_cameraHfovSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &StandardSkyViewer::onSensorFovChanged);
+    connect(m_cameraVfovSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &StandardSkyViewer::onSensorFovChanged);
     connectRenderCombo(m_colorSchemeCombo);
     connectRenderCombo(m_toneMapCombo);
     connectRenderSpin(m_referenceLuminanceSpin);
@@ -913,6 +1006,7 @@ void StandardSkyViewer::setupUi()
     connectRenderCheck(m_showSunGlowCheck);
     connectRenderCheck(m_showHorizonCheck);
 
+    updateSensorGeometryUi();
     rebuildWavelengthList();
     updateExportButtonText();
 }
@@ -967,6 +1061,40 @@ void StandardSkyViewer::onSensorTypeChanged()
     scheduleRender();
 }
 
+void StandardSkyViewer::onSensorGeometryChanged()
+{
+    updateSensorGeometryUi();
+    updateExportButtonText();
+    scheduleRender();
+}
+
+void StandardSkyViewer::onSensorFovChanged()
+{
+    const bool focalMode = m_sensorObserverTypeCombo && m_sensorObserverTypeCombo->currentData().toInt() == 0;
+    if (focalMode)
+    {
+        const double focal = std::max(0.001, m_sensorFocalSpin->value());
+        const double degToRad = 3.14159265358979323846 / 180.0;
+
+        // Preserve the current angular center, including off-axis sensors, while changing angular span.
+        const double xCenterAngle = 0.5 * (std::atan(m_sensorXStartSpin->value() / focal) + std::atan(m_sensorXEndSpin->value() / focal));
+        const double yCenterAngle = 0.5 * (std::atan(m_sensorYStartSpin->value() / focal) + std::atan(m_sensorYEndSpin->value() / focal));
+        const double halfH = 0.5 * m_cameraHfovSpin->value() * degToRad;
+        const double halfV = 0.5 * m_cameraVfovSpin->value() * degToRad;
+
+        {
+            QSignalBlocker b0(m_sensorXStartSpin), b1(m_sensorXEndSpin), b2(m_sensorYStartSpin), b3(m_sensorYEndSpin);
+            m_sensorXStartSpin->setValue(focal * std::tan(xCenterAngle - halfH));
+            m_sensorXEndSpin->setValue(focal * std::tan(xCenterAngle + halfH));
+            m_sensorYStartSpin->setValue(focal * std::tan(yCenterAngle - halfV));
+            m_sensorYEndSpin->setValue(focal * std::tan(yCenterAngle + halfV));
+        }
+        updateSensorGeometryUi();
+        updateExportButtonText();
+    }
+    scheduleRender();
+}
+
 void StandardSkyViewer::onWavelengthChanged()
 {
     double start = m_wavelengthStartSpin->value();
@@ -991,8 +1119,20 @@ void StandardSkyViewer::onResetView()
     m_cameraAzimuthSpin->setValue(0.0);
     m_cameraAltitudeSpin->setValue(20.0);
     m_cameraRollSpin->setValue(0.0);
-    m_cameraHfovSpin->setValue(90.0);
-    m_cameraVfovSpin->setValue(60.0);
+    if (m_sensorObserverTypeCombo->currentData().toInt() == 0)
+    {
+        m_sensorFocalSpin->setValue(50.0);
+        m_sensorXStartSpin->setValue(-50.0);
+        m_sensorXEndSpin->setValue(50.0);
+        m_sensorYStartSpin->setValue(-50.0);
+        m_sensorYEndSpin->setValue(50.0);
+    }
+    else
+    {
+        m_cameraHfovSpin->setValue(90.0);
+        m_cameraVfovSpin->setValue(60.0);
+    }
+    updateSensorGeometryUi();
     scheduleRender();
 }
 
@@ -1123,18 +1263,46 @@ SkyPerspectiveParameters StandardSkyViewer::currentParameters() const
     p.environmentLight = std::make_shared<CIESkyModel>(static_cast<CieSkyType>(p.cieSkyType + 1), sunDirection.theta, sunDirection.phi, 1.0, sRGB(0.72, 0.84, 1.0), 1.0);
     p.sunDirection = currentSunWorldDirection();
 
-    // Transform A（Viewer Camera -> World ENU）：相机姿态和 Xc/Yc/Zc 先独立生成世界 ENU 射线/原点，不再跟着 CIE E/N/U 一起旋转，因此修改天空 ENU 会真正改变观察结果。
-    p.useSensorFrameProjection = false;
+    // Transform A（Viewer Camera -> World ENU）：Local Camera 的位置和 RPY 同时驱动 Speos 风格 Focal Frame；CIE 天空本身是无限远方向场，因此传感器位置不会改变天空辐亮度，只改变三维几何中的观察点。
+    p.useSensorFrameProjection = m_sensorObserverTypeCombo->currentData().toInt() == 0;
     p.localCamera = m_localCameraCheck->isChecked();
     p.cameraPositionLocal = QVector3D(static_cast<float>(m_cameraXcSpin->value()), static_cast<float>(m_cameraYcSpin->value()), static_cast<float>(m_cameraZcSpin->value()));
-    // Standard CIE 使用半径 1.0 的 Viewer 天空球。Xc/Yc/Zc 只改变相机射线与该球的交点方向，CIESkyModel 仍然只按最终方向计算亮度。
-    p.useFiniteSkySphere = true;
+    p.useFiniteSkySphere = false;
     p.skySphereRadius = 1.0;
     p.cameraAzimuthDeg = m_cameraAzimuthSpin->value();
     p.cameraPitchDeg = m_cameraAltitudeSpin->value();
     p.cameraRollDeg = m_cameraRollSpin->value();
     p.horizontalFovDeg = m_cameraHfovSpin->value();
     p.verticalFovDeg = m_cameraVfovSpin->value();
+    p.sensorFocalMm = m_sensorFocalSpin->value();
+    p.sensorXStartMm = m_sensorXStartSpin->value();
+    p.sensorXEndMm = m_sensorXEndSpin->value();
+    p.sensorYStartMm = m_sensorYStartSpin->value();
+    p.sensorYEndMm = m_sensorYEndSpin->value();
+    p.sensorXMirror = m_sensorXMirrorCheck->isChecked();
+    p.sensorYMirror = m_sensorYMirrorCheck->isChecked();
+
+    double cameraToENU[3][3];
+    if (p.localCamera)
+    {
+        CameraTransform::buildCameraToENURotation(p.cameraAzimuthDeg, p.cameraPitchDeg, p.cameraRollDeg, cameraToENU);
+    }
+    else
+    {
+        CameraTransform::buildNavigationCameraToENU(p.cameraAzimuthDeg, p.cameraPitchDeg, p.cameraRollDeg, cameraToENU);
+    }
+    p.sensorXAxisWorld = QVector3D(static_cast<float>(cameraToENU[0][0]), static_cast<float>(cameraToENU[1][0]), static_cast<float>(cameraToENU[2][0])).normalized();
+    if (p.localCamera)
+    {
+        p.sensorYAxisWorld = QVector3D(static_cast<float>(cameraToENU[0][1]), static_cast<float>(cameraToENU[1][1]), static_cast<float>(cameraToENU[2][1])).normalized();
+    }
+    else
+    {
+        p.sensorYAxisWorld = -QVector3D(static_cast<float>(cameraToENU[0][1]), static_cast<float>(cameraToENU[1][1]), static_cast<float>(cameraToENU[2][1])).normalized();
+    }
+    p.sensorForwardWorld = QVector3D(static_cast<float>(cameraToENU[0][2]), static_cast<float>(cameraToENU[1][2]), static_cast<float>(cameraToENU[2][2])).normalized();
+    const QVector3D originWorld = p.localCamera ? QVector3D(static_cast<float>(cameraToENU[0][0] * m_cameraXcSpin->value() + cameraToENU[0][1] * m_cameraYcSpin->value() + cameraToENU[0][2] * m_cameraZcSpin->value()), static_cast<float>(cameraToENU[1][0] * m_cameraXcSpin->value() + cameraToENU[1][1] * m_cameraYcSpin->value() + cameraToENU[1][2] * m_cameraZcSpin->value()), static_cast<float>(cameraToENU[2][0] * m_cameraXcSpin->value() + cameraToENU[2][1] * m_cameraYcSpin->value() + cameraToENU[2][2] * m_cameraZcSpin->value())) : p.cameraPositionLocal;
+    p.sensorOriginWorldMm = originWorld;
 
     p.measurementType = static_cast<SkyMeasurementType>(m_sensorTypeCombo->currentData().toInt());
     p.measurementLayer = static_cast<SkyMeasurementLayer>(m_layerCombo->currentData().toInt());
@@ -1299,6 +1467,89 @@ void StandardSkyViewer::updateTimeZoneFromZone()
     }
     QSignalBlocker blocker(m_timeZoneSpin);
     m_timeZoneSpin->setValue(localDateTime.offsetFromUtc() / 3600.0);
+}
+
+void StandardSkyViewer::updateSensorGeometryUi()
+{
+    if (!m_sensorObserverTypeCombo || !m_sensorFocalSpin || !m_sensorXStartSpin || !m_sensorXEndSpin || !m_sensorXSamplingSpin || !m_sensorXResolutionSpin || !m_sensorYStartSpin || !m_sensorYEndSpin || !m_sensorYSamplingSpin || !m_sensorYResolutionSpin || !m_sensorXMirrorCheck || !m_sensorYMirrorCheck)
+    {
+        return;
+    }
+
+    const bool focalMode = m_sensorObserverTypeCombo->currentData().toInt() == 0;
+    double xStart = m_sensorXStartSpin->value();
+    double xEnd = m_sensorXEndSpin->value();
+    double yStart = m_sensorYStartSpin->value();
+    double yEnd = m_sensorYEndSpin->value();
+    if (xEnd <= xStart)
+    {
+        xEnd = xStart + 0.001;
+        QSignalBlocker blocker(m_sensorXEndSpin);
+        m_sensorXEndSpin->setValue(xEnd);
+    }
+    if (yEnd <= yStart)
+    {
+        yEnd = yStart + 0.001;
+        QSignalBlocker blocker(m_sensorYEndSpin);
+        m_sensorYEndSpin->setValue(yEnd);
+    }
+
+    const int xSamples = std::max(1, m_sensorXSamplingSpin->value());
+    const int ySamples = std::max(1, m_sensorYSamplingSpin->value());
+    const double xResolution = (xEnd - xStart) / xSamples;
+    const double yResolution = (yEnd - yStart) / ySamples;
+    {
+        QSignalBlocker blocker(m_sensorXResolutionSpin);
+        m_sensorXResolutionSpin->setValue(xResolution);
+    }
+    {
+        QSignalBlocker blocker(m_sensorYResolutionSpin);
+        m_sensorYResolutionSpin->setValue(yResolution);
+    }
+    {
+        QSignalBlocker blocker(m_outputWidthSpin);
+        m_outputWidthSpin->setValue(xSamples);
+    }
+    {
+        QSignalBlocker blocker(m_outputHeightSpin);
+        m_outputHeightSpin->setValue(ySamples);
+    }
+
+    m_sensorFocalSpin->setEnabled(focalMode);
+    m_sensorXStartSpin->setEnabled(focalMode);
+    m_sensorXEndSpin->setEnabled(focalMode);
+    m_sensorYStartSpin->setEnabled(focalMode);
+    m_sensorYEndSpin->setEnabled(focalMode);
+    m_sensorXSamplingSpin->setEnabled(true);
+    m_sensorYSamplingSpin->setEnabled(true);
+    m_sensorXMirrorCheck->setEnabled(focalMode);
+    m_sensorYMirrorCheck->setEnabled(focalMode);
+
+    if (focalMode)
+    {
+        const double focal = std::max(0.001, m_sensorFocalSpin->value());
+        const double horizontalFov = (std::atan(xEnd / focal) - std::atan(xStart / focal)) * kRadToDeg;
+        const double verticalFov = (std::atan(yEnd / focal) - std::atan(yStart / focal)) * kRadToDeg;
+        {
+            QSignalBlocker blocker(m_cameraHfovSpin);
+            m_cameraHfovSpin->setValue(std::max(0.001, std::min(179.999, horizontalFov)));
+        }
+        {
+            QSignalBlocker blocker(m_cameraVfovSpin);
+            m_cameraVfovSpin->setValue(std::max(0.001, std::min(179.999, verticalFov)));
+        }
+        m_cameraHfovSpin->setReadOnly(false);
+        m_cameraVfovSpin->setReadOnly(false);
+        m_cameraHfovSpin->setToolTip(tr("Linked to X Start/End and Focal. Editing HFOV preserves the current horizontal angular center and updates X Start/End."));
+        m_cameraVfovSpin->setToolTip(tr("Linked to Y Start/End and Focal. Editing VFOV preserves the current vertical angular center and updates Y Start/End."));
+    }
+    else
+    {
+        m_cameraHfovSpin->setReadOnly(false);
+        m_cameraVfovSpin->setReadOnly(false);
+        m_cameraHfovSpin->setToolTip(tr("Angular horizontal field of view in Observer mode."));
+        m_cameraVfovSpin->setToolTip(tr("Angular vertical field of view in Observer mode."));
+    }
 }
 
 void StandardSkyViewer::updateSensorUiState()

@@ -1,4 +1,5 @@
 #include "CIEWidget.h"
+#include "CameraTransform.h"
 
 #include "EpwReader.h"
 #include "SkyPolarWidget.h"
@@ -19,6 +20,7 @@
 #include <QScrollArea>
 #include <QSignalBlocker>
 #include <QSlider>
+#include <QSpinBox>
 #include <QSplitter>
 #include <QTabWidget>
 #include <QVBoxLayout>
@@ -257,6 +259,44 @@ void CIEWidget::setupUI()
 	enuLayout->addRow(tr("U (x,y,z)"), makeCieEnuRow(this, m_skyUpXSpin, m_skyUpYSpin, m_skyUpZSpin));
 	parameterLayout->addWidget(enuGroup);
 
+
+    // Sensor projection：与 CIE Standard General Sky Viewer 保持同一套 Focal / Observer 语义。
+    QGroupBox* sensorGroup = new QGroupBox(tr("Sensor"));
+    QFormLayout* sensorForm = new QFormLayout(sensorGroup);
+    m_sensorObserverTypeCombo = new QComboBox;
+    m_sensorObserverTypeCombo->addItem(tr("Focal (local frame)"), 0);
+    m_sensorObserverTypeCombo->addItem(tr("Observer (angular FOV)"), 1);
+    m_sensorObserverTypeCombo->setToolTip(tr("Focal uses physical X/Y dimensions and focal distance; Observer uses camera HFOV/VFOV directly."));
+    sensorForm->addRow(tr("Sensor observer type"), m_sensorObserverTypeCombo);
+    parameterLayout->addWidget(sensorGroup);
+
+    QGroupBox* sensorGeometryGroup = new QGroupBox(tr("Sensor Geometry"));
+    QFormLayout* sensorGeometryForm = new QFormLayout(sensorGeometryGroup);
+    m_sensorFocalSpin = new QDoubleSpinBox;
+    m_sensorFocalSpin->setRange(0.001, 1000000.0); m_sensorFocalSpin->setDecimals(3); m_sensorFocalSpin->setSuffix(" mm"); m_sensorFocalSpin->setValue(50.0); m_sensorFocalSpin->setKeyboardTracking(false);
+    sensorGeometryForm->addRow(tr("Focal"), m_sensorFocalSpin);
+    parameterLayout->addWidget(sensorGeometryGroup);
+
+    QGroupBox* xDimensionsGroup = new QGroupBox(tr("X dimensions"));
+    QFormLayout* xDimensionsForm = new QFormLayout(xDimensionsGroup);
+    m_sensorXStartSpin = new QDoubleSpinBox; m_sensorXStartSpin->setRange(-1000000.0, 1000000.0); m_sensorXStartSpin->setDecimals(4); m_sensorXStartSpin->setSuffix(" mm"); m_sensorXStartSpin->setValue(-50.0); m_sensorXStartSpin->setKeyboardTracking(false);
+    m_sensorXEndSpin = new QDoubleSpinBox; m_sensorXEndSpin->setRange(-1000000.0, 1000000.0); m_sensorXEndSpin->setDecimals(4); m_sensorXEndSpin->setSuffix(" mm"); m_sensorXEndSpin->setValue(50.0); m_sensorXEndSpin->setKeyboardTracking(false);
+    m_sensorXSamplingSpin = new QSpinBox; m_sensorXSamplingSpin->setRange(1, 23170); m_sensorXSamplingSpin->setValue(2000);
+    m_sensorXResolutionSpin = new QDoubleSpinBox; m_sensorXResolutionSpin->setRange(0.0, 1000000.0); m_sensorXResolutionSpin->setDecimals(6); m_sensorXResolutionSpin->setSuffix(" mm"); m_sensorXResolutionSpin->setReadOnly(true); m_sensorXResolutionSpin->setButtonSymbols(QAbstractSpinBox::NoButtons);
+    m_sensorXMirrorCheck = new QCheckBox(tr("Mirror X")); m_sensorXMirrorCheck->setToolTip(tr("Keep X Start and End symmetric about zero. Editing either side updates the other side."));
+    xDimensionsForm->addRow(tr("Start"), m_sensorXStartSpin); xDimensionsForm->addRow(tr("End"), m_sensorXEndSpin); xDimensionsForm->addRow(tr("Mirror"), m_sensorXMirrorCheck); xDimensionsForm->addRow(tr("Samples"), m_sensorXSamplingSpin); xDimensionsForm->addRow(tr("Resolution"), m_sensorXResolutionSpin);
+    parameterLayout->addWidget(xDimensionsGroup);
+
+    QGroupBox* yDimensionsGroup = new QGroupBox(tr("Y dimensions"));
+    QFormLayout* yDimensionsForm = new QFormLayout(yDimensionsGroup);
+    m_sensorYStartSpin = new QDoubleSpinBox; m_sensorYStartSpin->setRange(-1000000.0, 1000000.0); m_sensorYStartSpin->setDecimals(4); m_sensorYStartSpin->setSuffix(" mm"); m_sensorYStartSpin->setValue(-50.0); m_sensorYStartSpin->setKeyboardTracking(false);
+    m_sensorYEndSpin = new QDoubleSpinBox; m_sensorYEndSpin->setRange(-1000000.0, 1000000.0); m_sensorYEndSpin->setDecimals(4); m_sensorYEndSpin->setSuffix(" mm"); m_sensorYEndSpin->setValue(50.0); m_sensorYEndSpin->setKeyboardTracking(false);
+    m_sensorYSamplingSpin = new QSpinBox; m_sensorYSamplingSpin->setRange(1, 23170); m_sensorYSamplingSpin->setValue(2000);
+    m_sensorYResolutionSpin = new QDoubleSpinBox; m_sensorYResolutionSpin->setRange(0.0, 1000000.0); m_sensorYResolutionSpin->setDecimals(6); m_sensorYResolutionSpin->setSuffix(" mm"); m_sensorYResolutionSpin->setReadOnly(true); m_sensorYResolutionSpin->setButtonSymbols(QAbstractSpinBox::NoButtons);
+    m_sensorYMirrorCheck = new QCheckBox(tr("Mirror Y")); m_sensorYMirrorCheck->setToolTip(tr("Keep Y Start and End symmetric about zero. Editing either side updates the other side."));
+    yDimensionsForm->addRow(tr("Start"), m_sensorYStartSpin); yDimensionsForm->addRow(tr("End"), m_sensorYEndSpin); yDimensionsForm->addRow(tr("Mirror"), m_sensorYMirrorCheck); yDimensionsForm->addRow(tr("Samples"), m_sensorYSamplingSpin); yDimensionsForm->addRow(tr("Resolution"), m_sensorYResolutionSpin);
+    parameterLayout->addWidget(yDimensionsGroup);
+
 	// Viewer Camera：与 Standard Sky 使用同一套 Local Camera、Xc/Yc/Zc、Yaw/Pitch/Roll 和 FOV 语义。
 	QGroupBox* cameraGroup = new QGroupBox(tr("Viewer Camera"));
 	QFormLayout* cameraLayout = new QFormLayout(cameraGroup);
@@ -264,7 +304,7 @@ void CIEWidget::setupUI()
 	m_cameraXcSpin = makeViewerCameraPositionSpin(this, 0.0); m_cameraYcSpin = makeViewerCameraPositionSpin(this, 0.0); m_cameraZcSpin = makeViewerCameraPositionSpin(this, 0.0);
 	m_cameraXcSpin->setToolTip(tr("Finite viewer sky sphere radius is 1.0. Local Camera=true uses camera-local Xc/Yc/Zc translation; false uses ENU E/N/U translation. Translation changes the sphere hit direction, not the CIE sky model itself.")); m_cameraYcSpin->setToolTip(m_cameraXcSpin->toolTip()); m_cameraZcSpin->setToolTip(m_cameraXcSpin->toolTip());
 	m_cameraAzimuthSpin = makeViewerCameraAngleSpin(this, -180.0, 359.9, 0.0, 5.0); m_cameraAltitudeSpin = makeViewerCameraAngleSpin(this, -180.0, 180.0, 20.0, 5.0); m_cameraRollSpin = makeViewerCameraAngleSpin(this, -180.0, 180.0, 0.0, 1.0);
-	m_cameraHfovSpin = makeViewerCameraAngleSpin(this, 10.0, 170.0, 90.0, 1.0); m_cameraFovSpin = makeViewerCameraAngleSpin(this, 10.0, 170.0, 60.0, 1.0);
+	m_cameraHfovSpin = makeViewerCameraAngleSpin(this, 0.1, 179.9, 90.0, 1.0); m_cameraFovSpin = makeViewerCameraAngleSpin(this, 0.1, 179.9, 60.0, 1.0);
 	m_aimSunButton = new QPushButton(tr("Aim at Sun")); m_resetCameraButton = new QPushButton(tr("Reset Camera"));
 	QWidget* cameraButtons = new QWidget(cameraGroup); QHBoxLayout* cameraButtonLayout = new QHBoxLayout(cameraButtons); cameraButtonLayout->setContentsMargins(0, 0, 0, 0); cameraButtonLayout->addWidget(m_aimSunButton); cameraButtonLayout->addWidget(m_resetCameraButton);
 	cameraLayout->addRow(tr("Mode"), m_localCameraCheck); cameraLayout->addRow(tr("Xc"), m_cameraXcSpin); cameraLayout->addRow(tr("Yc"), m_cameraYcSpin); cameraLayout->addRow(tr("Zc"), m_cameraZcSpin);
@@ -431,10 +471,40 @@ void CIEWidget::setupUI()
 
 	connectPerspectiveSpin(m_cameraAzimuthSpin);
 	connectPerspectiveSpin(m_cameraAltitudeSpin);
-	connectPerspectiveSpin(m_cameraFovSpin);
+	connect(m_cameraFovSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double) { onSensorFovChanged(); });
 	connectPerspectiveSpin(m_cameraRollSpin);
-	connectPerspectiveSpin(m_cameraHfovSpin);
+	connect(m_cameraHfovSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double) { onSensorFovChanged(); });
 	connectPerspectiveSpin(m_cameraXcSpin); connectPerspectiveSpin(m_cameraYcSpin); connectPerspectiveSpin(m_cameraZcSpin);
+    connect(m_sensorObserverTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int) { onSensorGeometryChanged(); });
+    connect(m_sensorFocalSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double) { onSensorGeometryChanged(); });
+    connect(m_sensorXStartSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double value) {
+        if (m_sensorXMirrorCheck->isChecked()) { QSignalBlocker b(m_sensorXEndSpin); m_sensorXEndSpin->setValue(std::abs(value)); }
+        onSensorGeometryChanged();
+    });
+    connect(m_sensorXEndSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double value) {
+        if (m_sensorXMirrorCheck->isChecked()) { QSignalBlocker b(m_sensorXStartSpin); m_sensorXStartSpin->setValue(-std::abs(value)); }
+        onSensorGeometryChanged();
+    });
+    connect(m_sensorXSamplingSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int) { onSensorGeometryChanged(); });
+    connect(m_sensorYStartSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double value) {
+        if (m_sensorYMirrorCheck->isChecked()) { QSignalBlocker b(m_sensorYEndSpin); m_sensorYEndSpin->setValue(std::abs(value)); }
+        onSensorGeometryChanged();
+    });
+    connect(m_sensorYEndSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double value) {
+        if (m_sensorYMirrorCheck->isChecked()) { QSignalBlocker b(m_sensorYStartSpin); m_sensorYStartSpin->setValue(-std::abs(value)); }
+        onSensorGeometryChanged();
+    });
+    connect(m_sensorYSamplingSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int) { onSensorGeometryChanged(); });
+    connect(m_sensorXMirrorCheck, &QCheckBox::toggled, this, [this](bool checked) {
+        if (checked) { const double half = std::max(std::abs(m_sensorXStartSpin->value()), std::abs(m_sensorXEndSpin->value())); QSignalBlocker b0(m_sensorXStartSpin), b1(m_sensorXEndSpin); m_sensorXStartSpin->setValue(-half); m_sensorXEndSpin->setValue(half); }
+        onSensorGeometryChanged();
+    });
+    connect(m_sensorYMirrorCheck, &QCheckBox::toggled, this, [this](bool checked) {
+        if (checked) { const double half = std::max(std::abs(m_sensorYStartSpin->value()), std::abs(m_sensorYEndSpin->value())); QSignalBlocker b0(m_sensorYStartSpin), b1(m_sensorYEndSpin); m_sensorYStartSpin->setValue(-half); m_sensorYEndSpin->setValue(half); }
+        onSensorGeometryChanged();
+    });
+    updateSensorGeometryUi();
+
 	connectPerspectiveSpin(m_skyEastXSpin); connectPerspectiveSpin(m_skyEastYSpin); connectPerspectiveSpin(m_skyEastZSpin);
 	connectPerspectiveSpin(m_skyNorthXSpin); connectPerspectiveSpin(m_skyNorthYSpin); connectPerspectiveSpin(m_skyNorthZSpin);
 	connectPerspectiveSpin(m_skyUpXSpin); connectPerspectiveSpin(m_skyUpYSpin); connectPerspectiveSpin(m_skyUpZSpin);
@@ -738,7 +808,23 @@ SkyPerspectiveParameters CIEWidget::currentPerspectiveParameters() const
 	parameters.cameraPitchDeg = m_cameraAltitudeSpin->value();
 	parameters.verticalFovDeg = m_cameraFovSpin->value();
 	parameters.cameraRollDeg = m_cameraRollSpin->value();
+
 	parameters.horizontalFovDeg = m_cameraHfovSpin->value();
+
+    parameters.useSensorFrameProjection = m_sensorObserverTypeCombo->currentData().toInt() == 0;
+    parameters.sensorFocalMm = m_sensorFocalSpin->value();
+    parameters.sensorXStartMm = m_sensorXStartSpin->value(); parameters.sensorXEndMm = m_sensorXEndSpin->value();
+    parameters.sensorYStartMm = m_sensorYStartSpin->value(); parameters.sensorYEndMm = m_sensorYEndSpin->value();
+    parameters.sensorXMirror = false; parameters.sensorYMirror = false;
+    double cameraToENU[3][3];
+    if (parameters.localCamera) CameraTransform::buildCameraToENURotation(parameters.cameraAzimuthDeg, parameters.cameraPitchDeg, parameters.cameraRollDeg, cameraToENU);
+    else CameraTransform::buildNavigationCameraToENU(parameters.cameraAzimuthDeg, parameters.cameraPitchDeg, parameters.cameraRollDeg, cameraToENU);
+    parameters.sensorXAxisWorld = QVector3D(cameraToENU[0][0], cameraToENU[1][0], cameraToENU[2][0]).normalized();
+    parameters.sensorYAxisWorld = parameters.localCamera ? QVector3D(cameraToENU[0][1], cameraToENU[1][1], cameraToENU[2][1]).normalized() : -QVector3D(cameraToENU[0][1], cameraToENU[1][1], cameraToENU[2][1]).normalized();
+    parameters.sensorForwardWorld = QVector3D(cameraToENU[0][2], cameraToENU[1][2], cameraToENU[2][2]).normalized();
+    const QVector3D originWorld = parameters.localCamera ? QVector3D(cameraToENU[0][0] * m_cameraXcSpin->value() + cameraToENU[0][1] * m_cameraYcSpin->value() + cameraToENU[0][2] * m_cameraZcSpin->value(), cameraToENU[1][0] * m_cameraXcSpin->value() + cameraToENU[1][1] * m_cameraYcSpin->value() + cameraToENU[1][2] * m_cameraZcSpin->value(), cameraToENU[2][0] * m_cameraXcSpin->value() + cameraToENU[2][1] * m_cameraYcSpin->value() + cameraToENU[2][2] * m_cameraZcSpin->value()) : parameters.cameraPositionLocal;
+    parameters.sensorOriginWorldMm = originWorld;
+
 
 	parameters.colorMode = static_cast<SkyColorMode>(m_colorModeCombo->currentData().toInt());
 
@@ -884,6 +970,56 @@ void CIEWidget::onPerspectiveControlsChanged()
     updatePerspectiveView();
 }
 
+
+void CIEWidget::onSensorGeometryChanged()
+{
+    updateSensorGeometryUi();
+    updatePerspectiveView();
+}
+
+void CIEWidget::onSensorFovChanged()
+{
+    const bool focalMode = m_sensorObserverTypeCombo && m_sensorObserverTypeCombo->currentData().toInt() == 0;
+    if (focalMode) {
+        const double focal = std::max(0.001, m_sensorFocalSpin->value());
+        const double degToRad = 3.14159265358979323846 / 180.0;
+        const double xCenter = 0.5 * (std::atan(m_sensorXStartSpin->value()/focal) + std::atan(m_sensorXEndSpin->value()/focal));
+        const double yCenter = 0.5 * (std::atan(m_sensorYStartSpin->value()/focal) + std::atan(m_sensorYEndSpin->value()/focal));
+        const double halfH = 0.5 * m_cameraHfovSpin->value() * degToRad;
+        const double halfV = 0.5 * m_cameraFovSpin->value() * degToRad;
+        QSignalBlocker b0(m_sensorXStartSpin), b1(m_sensorXEndSpin), b2(m_sensorYStartSpin), b3(m_sensorYEndSpin);
+        m_sensorXStartSpin->setValue(focal * std::tan(xCenter-halfH)); m_sensorXEndSpin->setValue(focal * std::tan(xCenter+halfH));
+        m_sensorYStartSpin->setValue(focal * std::tan(yCenter-halfV)); m_sensorYEndSpin->setValue(focal * std::tan(yCenter+halfV));
+    }
+    updatePerspectiveView();
+}
+
+void CIEWidget::updateSensorGeometryUi()
+{
+    if (!m_sensorObserverTypeCombo) return;
+    const bool focalMode = m_sensorObserverTypeCombo->currentData().toInt() == 0;
+    double xs=m_sensorXStartSpin->value(), xe=m_sensorXEndSpin->value(), ys=m_sensorYStartSpin->value(), ye=m_sensorYEndSpin->value();
+    if (xe <= xs) { xe=xs+0.001; QSignalBlocker b(m_sensorXEndSpin); m_sensorXEndSpin->setValue(xe); }
+    if (ye <= ys) { ye=ys+0.001; QSignalBlocker b(m_sensorYEndSpin); m_sensorYEndSpin->setValue(ye); }
+    const int xSamples = std::max(1, m_sensorXSamplingSpin->value());
+    const int ySamples = std::max(1, m_sensorYSamplingSpin->value());
+    { QSignalBlocker b(m_sensorXResolutionSpin); m_sensorXResolutionSpin->setValue(std::abs(xe-xs) / static_cast<double>(xSamples)); }
+    { QSignalBlocker b(m_sensorYResolutionSpin); m_sensorYResolutionSpin->setValue(std::abs(ye-ys) / static_cast<double>(ySamples)); }
+    m_sensorFocalSpin->setEnabled(focalMode); m_sensorXStartSpin->setEnabled(focalMode); m_sensorXEndSpin->setEnabled(focalMode); m_sensorYStartSpin->setEnabled(focalMode); m_sensorYEndSpin->setEnabled(focalMode);
+    m_sensorXSamplingSpin->setEnabled(true); m_sensorYSamplingSpin->setEnabled(true); m_sensorXMirrorCheck->setEnabled(focalMode); m_sensorYMirrorCheck->setEnabled(focalMode);
+    if (m_exportButton) m_exportButton->setText(tr("Export PNG (%1 × %2)").arg(xSamples).arg(ySamples));
+    if (focalMode) {
+        const double focal=std::max(0.001,m_sensorFocalSpin->value()), radToDeg=180.0/3.14159265358979323846;
+        const double hf=(std::atan(xe/focal)-std::atan(xs/focal))*radToDeg, vf=(std::atan(ye/focal)-std::atan(ys/focal))*radToDeg;
+        { QSignalBlocker b(m_cameraHfovSpin); m_cameraHfovSpin->setValue(std::max(0.1,std::min(179.9,hf))); }
+        { QSignalBlocker b(m_cameraFovSpin); m_cameraFovSpin->setValue(std::max(0.1,std::min(179.9,vf))); }
+        m_cameraHfovSpin->setToolTip(tr("Linked to Focal and X dimensions. Editing HFOV preserves the current angular center and updates X Start/End."));
+        m_cameraFovSpin->setToolTip(tr("Linked to Focal and Y dimensions. Editing VFOV preserves the current angular center and updates Y Start/End."));
+    } else {
+        m_cameraHfovSpin->setToolTip(tr("Angular horizontal field of view in Observer mode.")); m_cameraFovSpin->setToolTip(tr("Angular vertical field of view in Observer mode."));
+    }
+}
+
 void CIEWidget::onScaleModeChanged()
 {
     updateScaleInputsFromCurrentRecord();
@@ -923,7 +1059,7 @@ void CIEWidget::onExportPerspective()
 
     if (!m_perspectiveWidget->savePng(
             path,
-            QSize(1920, 1080))) {
+            QSize(std::max(1, m_sensorXSamplingSpin->value()), std::max(1, m_sensorYSamplingSpin->value())))) {
 
         QMessageBox::warning(
             this,

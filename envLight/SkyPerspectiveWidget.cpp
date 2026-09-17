@@ -526,6 +526,32 @@ SkySceneState SkyPerspectiveWidget::sceneState() const
     state.sunDirectionWorld = m_parameters.sunDirection.normalized();
     state.cameraOriginWorld = cameraOriginWorld();
 
+    if (m_parameters.useSensorFrameProjection)
+    {
+        QVector3D sensorX = m_parameters.sensorXAxisWorld.normalized();
+        QVector3D sensorY = m_parameters.sensorYAxisWorld;
+        sensorY -= QVector3D::dotProduct(sensorY, sensorX) * sensorX;
+        sensorY = sensorY.lengthSquared() < 1.0e-12f ? QVector3D(0.0f, 0.0f, 1.0f) : sensorY.normalized();
+        QVector3D forward = m_parameters.sensorForwardWorld;
+        forward -= QVector3D::dotProduct(forward, sensorX) * sensorX;
+        forward -= QVector3D::dotProduct(forward, sensorY) * sensorY;
+        if (forward.lengthSquared() < 1.0e-12f)
+        {
+            forward = QVector3D::crossProduct(sensorX, sensorY);
+        }
+        forward = forward.lengthSquared() < 1.0e-12f ? QVector3D(1.0f, 0.0f, 0.0f) : forward.normalized();
+        state.cameraXAxisWorld = sensorX;
+        state.cameraYAxisWorld = sensorY;
+        state.cameraForwardWorld = forward;
+        const double xCoords[4] = {m_parameters.sensorXStartMm, m_parameters.sensorXEndMm, m_parameters.sensorXEndMm, m_parameters.sensorXStartMm};
+        const double yCoords[4] = {m_parameters.sensorYEndMm, m_parameters.sensorYEndMm, m_parameters.sensorYStartMm, m_parameters.sensorYStartMm};
+        for (int index = 0; index < 4; ++index)
+        {
+            state.frustumDirectionsWorld[index] = (static_cast<float>(m_parameters.sensorFocalMm) * forward + static_cast<float>(xCoords[index]) * sensorX + static_cast<float>(yCoords[index]) * sensorY).normalized();
+        }
+        return state;
+    }
+
     const double tanHalfHorizontal = std::tan(0.5 * m_parameters.horizontalFovDeg * kDegToRad);
     const double tanHalfVertical = std::tan(0.5 * m_parameters.verticalFovDeg * kDegToRad);
     const double cornerX[4] = {-tanHalfHorizontal, tanHalfHorizontal, tanHalfHorizontal, -tanHalfHorizontal};
@@ -823,10 +849,24 @@ QVector3D SkyPerspectiveWidget::cameraRay(int x, int y, int width, int height) c
             sensorY -= QVector3D::dotProduct(sensorY, sensorX) * sensorX;
         }
         sensorY.normalize();
-        QVector3D sensorNormal = QVector3D::crossProduct(sensorX, sensorY);
+        QVector3D sensorNormal = m_parameters.sensorForwardWorld;
+        sensorNormal -= QVector3D::dotProduct(sensorNormal, sensorX) * sensorX;
+        sensorNormal -= QVector3D::dotProduct(sensorNormal, sensorY) * sensorY;
+        if (sensorNormal.lengthSquared() < 1.0e-12f)
+        {
+            sensorNormal = QVector3D::crossProduct(sensorX, sensorY);
+        }
         sensorNormal = sensorNormal.lengthSquared() < 1.0e-12f ? QVector3D(0.0f, 0.0f, 1.0f) : sensorNormal.normalized();
-        const double u = (x + 0.5) / safeWidth;
-        const double v = (y + 0.5) / safeHeight;
+        double u = (x + 0.5) / safeWidth;
+        double v = (y + 0.5) / safeHeight;
+        if (m_parameters.sensorXMirror)
+        {
+            u = 1.0 - u;
+        }
+        if (m_parameters.sensorYMirror)
+        {
+            v = 1.0 - v;
+        }
         const double sensorCoordX = m_parameters.sensorXStartMm + u * (m_parameters.sensorXEndMm - m_parameters.sensorXStartMm);
         const double sensorCoordY = m_parameters.sensorYEndMm - v * (m_parameters.sensorYEndMm - m_parameters.sensorYStartMm);
         return (static_cast<float>(m_parameters.sensorFocalMm) * sensorNormal + static_cast<float>(sensorCoordX) * sensorX + static_cast<float>(sensorCoordY) * sensorY).normalized();

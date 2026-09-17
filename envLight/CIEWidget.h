@@ -15,6 +15,7 @@ class QDoubleSpinBox;
 class QLabel;
 class QPushButton;
 class QSlider;
+class QSpinBox;
 class QTabWidget;
 QT_END_NAMESPACE
 
@@ -36,6 +37,8 @@ private slots:
     void onSliderTime(int value);
     void onRenderTimeout();
     void onPerspectiveControlsChanged();
+    void onSensorGeometryChanged();
+    void onSensorFovChanged();
     void onScaleModeChanged();
     void onWeatherModeChanged();
     void onAimAtSun();
@@ -60,6 +63,7 @@ private:
     currentPerspectiveParameters() const;
 
     void updatePerspectiveView();
+    void updateSensorGeometryUi();
     void updateScaleInputsFromCurrentRecord();
     void updateWeatherInputsFromCurrentRecord();
     WeatherVisualState selectedWeatherState() const;
@@ -91,6 +95,20 @@ private:
     QDoubleSpinBox* m_cameraFovSpin = nullptr;
 	QDoubleSpinBox* m_cameraRollSpin = nullptr;
 	QDoubleSpinBox* m_cameraHfovSpin = nullptr;
+
+    // Sensor projection controls.
+    QComboBox* m_sensorObserverTypeCombo = nullptr;
+    QDoubleSpinBox* m_sensorFocalSpin = nullptr;
+    QDoubleSpinBox* m_sensorXStartSpin = nullptr;
+    QDoubleSpinBox* m_sensorXEndSpin = nullptr;
+    QSpinBox* m_sensorXSamplingSpin = nullptr;
+    QDoubleSpinBox* m_sensorXResolutionSpin = nullptr;
+    QCheckBox* m_sensorXMirrorCheck = nullptr;
+    QDoubleSpinBox* m_sensorYStartSpin = nullptr;
+    QDoubleSpinBox* m_sensorYEndSpin = nullptr;
+    QSpinBox* m_sensorYSamplingSpin = nullptr;
+    QDoubleSpinBox* m_sensorYResolutionSpin = nullptr;
+    QCheckBox* m_sensorYMirrorCheck = nullptr;
     QDoubleSpinBox* m_skyEastXSpin = nullptr;
     QDoubleSpinBox* m_skyEastYSpin = nullptr;
     QDoubleSpinBox* m_skyEastZSpin = nullptr;

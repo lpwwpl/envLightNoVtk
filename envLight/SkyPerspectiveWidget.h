@@ -125,11 +125,14 @@ struct SkyPerspectiveParameters {
     QVector3D sensorOriginWorldMm{0.0f, 0.0f, 0.0f};
     QVector3D sensorXAxisWorld{1.0f, 0.0f, 0.0f};
     QVector3D sensorYAxisWorld{0.0f, 1.0f, 0.0f};
+    QVector3D sensorForwardWorld{0.0f, 0.0f, 1.0f};
     double sensorFocalMm = 50.0;
     double sensorXStartMm = -50.0;
     double sensorXEndMm = 50.0;
     double sensorYStartMm = -50.0;
     double sensorYEndMm = 50.0;
+    bool sensorXMirror = false;
+    bool sensorYMirror = false;
 
     // 兼容 Speos Direct Integration Angle。当前解析模型仅保存，不做蒙特卡洛模糊。
     double directIntegrationAngleDeg = 5.0;
