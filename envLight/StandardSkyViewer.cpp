@@ -778,9 +778,9 @@ void StandardSkyViewer::setupUi()
     m_sensorXResolutionSpin->setButtonSymbols(QAbstractSpinBox::NoButtons);
     xDimensionsForm->addRow(tr("Start"), m_sensorXStartSpin);
     xDimensionsForm->addRow(tr("End"), m_sensorXEndSpin);
-    m_sensorXMirrorCheck = new QCheckBox(tr("Mirror X sampling"));
+    m_sensorXMirrorCheck = new QCheckBox(tr("Mirror X"));
     m_sensorXMirrorCheck->setChecked(false);
-    m_sensorXMirrorCheck->setToolTip(tr("Reverse X sampling direction without changing the physical Start/End range."));
+    m_sensorXMirrorCheck->setToolTip(tr("Keep X Start and End symmetric about zero. Editing either side updates the other side."));
     xDimensionsForm->addRow(tr("Mirror"), m_sensorXMirrorCheck);
     xDimensionsForm->addRow(tr("Sampling"), m_sensorXSamplingSpin);
     xDimensionsForm->addRow(tr("Resolution"), m_sensorXResolutionSpin);
@@ -811,9 +811,9 @@ void StandardSkyViewer::setupUi()
     m_sensorYResolutionSpin->setButtonSymbols(QAbstractSpinBox::NoButtons);
     yDimensionsForm->addRow(tr("Start"), m_sensorYStartSpin);
     yDimensionsForm->addRow(tr("End"), m_sensorYEndSpin);
-    m_sensorYMirrorCheck = new QCheckBox(tr("Mirror Y sampling"));
+    m_sensorYMirrorCheck = new QCheckBox(tr("Mirror Y"));
     m_sensorYMirrorCheck->setChecked(false);
-    m_sensorYMirrorCheck->setToolTip(tr("Reverse Y sampling direction without changing the physical Start/End range."));
+    m_sensorYMirrorCheck->setToolTip(tr("Keep Y Start and End symmetric about zero. Editing either side updates the other side."));
     yDimensionsForm->addRow(tr("Mirror"), m_sensorYMirrorCheck);
     yDimensionsForm->addRow(tr("Sampling"), m_sensorYSamplingSpin);
     yDimensionsForm->addRow(tr("Resolution"), m_sensorYResolutionSpin);
@@ -951,14 +951,14 @@ void StandardSkyViewer::setupUi()
     connect(m_sensorTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &StandardSkyViewer::onSensorTypeChanged);
     connect(m_sensorObserverTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &StandardSkyViewer::onSensorGeometryChanged);
     connect(m_sensorFocalSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &StandardSkyViewer::onSensorGeometryChanged);
-    connect(m_sensorXStartSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &StandardSkyViewer::onSensorGeometryChanged);
-    connect(m_sensorXEndSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &StandardSkyViewer::onSensorGeometryChanged);
+    connect(m_sensorXStartSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double value) { if (m_sensorXMirrorCheck->isChecked()) { QSignalBlocker b(m_sensorXEndSpin); m_sensorXEndSpin->setValue(std::abs(value)); } onSensorGeometryChanged(); });
+    connect(m_sensorXEndSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double value) { if (m_sensorXMirrorCheck->isChecked()) { QSignalBlocker b(m_sensorXStartSpin); m_sensorXStartSpin->setValue(-std::abs(value)); } onSensorGeometryChanged(); });
     connect(m_sensorXSamplingSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, &StandardSkyViewer::onSensorGeometryChanged);
-    connect(m_sensorXMirrorCheck, &QCheckBox::toggled, this, &StandardSkyViewer::onSensorGeometryChanged);
-    connect(m_sensorYStartSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &StandardSkyViewer::onSensorGeometryChanged);
-    connect(m_sensorYEndSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &StandardSkyViewer::onSensorGeometryChanged);
+    connect(m_sensorXMirrorCheck, &QCheckBox::toggled, this, [this](bool checked) { if (checked) { const double half = std::max(std::abs(m_sensorXStartSpin->value()), std::abs(m_sensorXEndSpin->value())); QSignalBlocker b0(m_sensorXStartSpin), b1(m_sensorXEndSpin); m_sensorXStartSpin->setValue(-half); m_sensorXEndSpin->setValue(half); } onSensorGeometryChanged(); });
+    connect(m_sensorYStartSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double value) { if (m_sensorYMirrorCheck->isChecked()) { QSignalBlocker b(m_sensorYEndSpin); m_sensorYEndSpin->setValue(std::abs(value)); } onSensorGeometryChanged(); });
+    connect(m_sensorYEndSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double value) { if (m_sensorYMirrorCheck->isChecked()) { QSignalBlocker b(m_sensorYStartSpin); m_sensorYStartSpin->setValue(-std::abs(value)); } onSensorGeometryChanged(); });
     connect(m_sensorYSamplingSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, &StandardSkyViewer::onSensorGeometryChanged);
-    connect(m_sensorYMirrorCheck, &QCheckBox::toggled, this, &StandardSkyViewer::onSensorGeometryChanged);
+    connect(m_sensorYMirrorCheck, &QCheckBox::toggled, this, [this](bool checked) { if (checked) { const double half = std::max(std::abs(m_sensorYStartSpin->value()), std::abs(m_sensorYEndSpin->value())); QSignalBlocker b0(m_sensorYStartSpin), b1(m_sensorYEndSpin); m_sensorYStartSpin->setValue(-half); m_sensorYEndSpin->setValue(half); } onSensorGeometryChanged(); });
     connect(m_wavelengthStartSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &StandardSkyViewer::onWavelengthChanged);
     connect(m_wavelengthEndSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &StandardSkyViewer::onWavelengthChanged);
     connect(m_wavelengthSamplingSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, &StandardSkyViewer::onWavelengthChanged);
@@ -1279,8 +1279,8 @@ SkyPerspectiveParameters StandardSkyViewer::currentParameters() const
     p.sensorXEndMm = m_sensorXEndSpin->value();
     p.sensorYStartMm = m_sensorYStartSpin->value();
     p.sensorYEndMm = m_sensorYEndSpin->value();
-    p.sensorXMirror = m_sensorXMirrorCheck->isChecked();
-    p.sensorYMirror = m_sensorYMirrorCheck->isChecked();
+    p.sensorXMirror = false;
+    p.sensorYMirror = false;
 
     double cameraToENU[3][3];
     if (p.localCamera)
