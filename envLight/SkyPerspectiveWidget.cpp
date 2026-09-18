@@ -4,6 +4,8 @@
 
 #include <QMouseEvent>
 #include <QContextMenuEvent>
+#include <QEvent>
+#include <QToolTip>
 #include <QMenu>
 #include <QPainter>
 #include <QPainterPath>
@@ -382,6 +384,223 @@ QString measurementTypeText(SkyMeasurementType type)
 
 } // namespace
 
+
+// ================================================================
+// PerspectiveColorBarWidget
+// 独立顶层 Tool 窗口：不占用 PerspectiveWidget 的客户区，可拖到其外部。
+// ================================================================
+class PerspectiveColorBarWidget final : public QWidget
+{
+public:
+    explicit PerspectiveColorBarWidget(SkyPerspectiveWidget* owner)
+        : QWidget(owner, Qt::Tool | Qt::FramelessWindowHint), m_owner(owner)
+    {
+        setAttribute(Qt::WA_DeleteOnClose, false);
+        setMouseTracking(true);
+        setFixedSize(141, 323); // 约为上一版 188x430 的 3/4
+        setWindowTitle(QStringLiteral("Colorbar"));
+    }
+
+protected:
+    void paintEvent(QPaintEvent*) override
+    {
+        if (!m_owner || m_owner->m_parameters.colorMode == SkyColorMode::NaturalPreview)
+            return;
+
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setPen(QPen(QColor(105, 105, 105), 1.0));
+        painter.setBrush(QColor(235, 235, 235));
+        painter.drawRoundedRect(rect().adjusted(0, 0, -1, -1), 3.0, 3.0);
+
+        painter.setPen(QColor(25, 25, 25));
+        QFont titleFont = painter.font();
+        titleFont.setPointSizeF(std::max(7.0, titleFont.pointSizeF() - 1.0));
+        painter.setFont(titleFont);
+        painter.drawText(QRect(6, 4, width() - 30, 16), Qt::AlignLeft | Qt::AlignVCenter,
+                         m_owner->colorBarTitle());
+
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(181, 65, 60));
+        painter.drawRect(closeRect());
+        painter.setPen(Qt::white);
+        painter.drawText(closeRect(), Qt::AlignCenter, QString::fromUtf8("×"));
+
+        const QRect bar = gradientRect();
+        for (int yy = 0; yy < bar.height(); ++yy) {
+            const double n = 1.0 - static_cast<double>(yy) / std::max(1, bar.height() - 1);
+            painter.setPen(m_owner->colorBarColor(n));
+            painter.drawLine(bar.left(), bar.top() + yy, bar.right(), bar.top() + yy);
+        }
+        painter.setPen(QColor(75, 75, 75));
+        painter.setBrush(Qt::NoBrush);
+        painter.drawRect(bar);
+
+        const int tickCount = 10;
+        QFont tickFont = painter.font();
+        tickFont.setPointSizeF(std::max(6.0, tickFont.pointSizeF() - 2.0));
+        painter.setFont(tickFont);
+        for (int i = 0; i < tickCount; ++i) {
+            const double f = static_cast<double>(i) / (tickCount - 1);
+            const int y = bar.top() + static_cast<int>(std::round(f * (bar.height() - 1)));
+            const double n = 1.0 - f;
+            const double value = m_owner->colorBarValueFromNormalized(n);
+            painter.setPen(QColor(50, 50, 50));
+            painter.drawLine(bar.right() + 1, y, bar.right() + 6, y);
+            painter.drawText(QRect(bar.right() + 8, y - 7, width() - bar.right() - 11, 14),
+                             Qt::AlignLeft | Qt::AlignVCenter,
+                             m_owner->formatMeasurementValue(value));
+        }
+
+        if (m_hoverValid && bar.contains(m_hoverPos)) {
+            const int y = m_hoverPos.y();
+            painter.setPen(QPen(Qt::white, 2.0));
+            painter.drawLine(bar.left(), y, bar.right(), y);
+            painter.setPen(QPen(Qt::black, 1.0));
+            painter.drawLine(bar.left(), y + 1, bar.right(), y + 1);
+            QRect bubble(bar.right() + 6, y - 11, width() - bar.right() - 12, 22);
+            if (bubble.top() < bar.top()) bubble.moveTop(bar.top());
+            if (bubble.bottom() > bar.bottom()) bubble.moveBottom(bar.bottom());
+            painter.setPen(QColor(55, 55, 55));
+            painter.setBrush(QColor(255, 255, 225));
+            painter.drawRoundedRect(bubble, 2, 2);
+            painter.drawText(bubble.adjusted(2, 0, -1, 0), Qt::AlignLeft | Qt::AlignVCenter,
+                             m_owner->formatMeasurementValue(m_hoverValue));
+        }
+
+        const QRect eye = eyedropperRect();
+        painter.setPen(QColor(90, 90, 90));
+        painter.setBrush(m_owner->m_eyedropperEnabled ? QColor(210, 225, 245) : QColor(246, 246, 246));
+        painter.drawRect(eye);
+        painter.drawText(eye, Qt::AlignCenter, QString::fromUtf8("吸管取值"));
+        if (m_owner->m_eyedropperValid) {
+            painter.setPen(QColor(35, 35, 35));
+            painter.drawText(QRect(eye.right() + 4, eye.top(), width() - eye.right() - 7, eye.height()),
+                             Qt::AlignLeft | Qt::AlignVCenter,
+                             m_owner->formatMeasurementValue(m_owner->m_eyedropperValue));
+        }
+
+        const auto drawRadio = [&](const QRect& r, const QString& label, bool checked) {
+            painter.setPen(QColor(45, 45, 45));
+            painter.setBrush(Qt::NoBrush);
+            painter.drawEllipse(QRect(r.left() + 2, r.center().y() - 4, 8, 8));
+            if (checked) {
+                painter.setBrush(QColor(45, 45, 45));
+                painter.drawEllipse(QRect(r.left() + 4, r.center().y() - 1, 3, 3));
+            }
+            painter.drawText(r.adjusted(13, 0, 0, 0), Qt::AlignLeft | Qt::AlignVCenter, label);
+        };
+        drawRadio(linearRect(), QStringLiteral("Linear"), !m_owner->m_colorBarLogScale);
+        drawRadio(logRect(), QStringLiteral("Log"), m_owner->m_colorBarLogScale);
+    }
+
+    void mousePressEvent(QMouseEvent* event) override
+    {
+        if (!m_owner || event->button() != Qt::LeftButton) {
+            QWidget::mousePressEvent(event);
+            return;
+        }
+        if (closeRect().contains(event->pos())) {
+            m_owner->hideColorBarWindow();
+            event->accept();
+            return;
+        }
+        if (eyedropperRect().contains(event->pos())) {
+            m_owner->m_eyedropperEnabled = !m_owner->m_eyedropperEnabled;
+            if (!m_owner->m_eyedropperEnabled) m_owner->m_eyedropperValid = false;
+            m_owner->update();
+            update();
+            event->accept();
+            return;
+        }
+        if (linearRect().contains(event->pos())) {
+            if (m_owner->m_colorBarLogScale) {
+                m_owner->m_colorBarLogScale = false;
+                m_owner->rebuildPreview();
+                m_owner->update();
+                update();
+            }
+            event->accept();
+            return;
+        }
+        if (logRect().contains(event->pos())) {
+            if (!m_owner->m_colorBarLogScale) {
+                m_owner->m_colorBarLogScale = true;
+                m_owner->rebuildPreview();
+                m_owner->update();
+                update();
+            }
+            event->accept();
+            return;
+        }
+        if (headerRect().contains(event->pos())) {
+            m_dragging = true;
+            m_dragOffset = event->globalPos() - frameGeometry().topLeft();
+            setCursor(Qt::ClosedHandCursor);
+            event->accept();
+            return;
+        }
+        QWidget::mousePressEvent(event);
+    }
+
+    void mouseMoveEvent(QMouseEvent* event) override
+    {
+        if (m_dragging && (event->buttons() & Qt::LeftButton)) {
+            move(event->globalPos() - m_dragOffset);
+            event->accept();
+            return;
+        }
+        const QRect bar = gradientRect();
+        const bool hover = bar.contains(event->pos());
+        if (hover) {
+            const double n = 1.0 - static_cast<double>(event->pos().y() - bar.top()) /
+                                      std::max(1, bar.height() - 1);
+            m_hoverPos = event->pos();
+            m_hoverValue = m_owner->colorBarValueFromNormalized(n);
+        }
+        if (hover != m_hoverValid || hover) {
+            m_hoverValid = hover;
+            update();
+        }
+        event->accept();
+    }
+
+    void mouseReleaseEvent(QMouseEvent* event) override
+    {
+        if (event->button() == Qt::LeftButton && m_dragging) {
+            m_dragging = false;
+            unsetCursor();
+            event->accept();
+            return;
+        }
+        QWidget::mouseReleaseEvent(event);
+    }
+
+    void leaveEvent(QEvent* event) override
+    {
+        if (m_hoverValid) {
+            m_hoverValid = false;
+            update();
+        }
+        QWidget::leaveEvent(event);
+    }
+
+private:
+    QRect closeRect() const { return QRect(width() - 19, 5, 13, 13); }
+    QRect headerRect() const { return QRect(0, 0, width() - 23, 26); }
+    QRect gradientRect() const { return QRect(10, 32, 37, std::max(90, height() - 32 - 59)); }
+    QRect eyedropperRect() const { return QRect(8, height() - 50, 58, 17); }
+    QRect linearRect() const { return QRect(9, height() - 27, 54, 17); }
+    QRect logRect() const { return QRect(70, height() - 27, 47, 17); }
+
+    SkyPerspectiveWidget* m_owner = nullptr;
+    bool m_dragging = false;
+    QPoint m_dragOffset;
+    bool m_hoverValid = false;
+    QPoint m_hoverPos;
+    double m_hoverValue = 0.0;
+};
+
 // ================================================================
 // SkyPerspectiveWidget
 // ================================================================
@@ -508,6 +727,10 @@ void SkyPerspectiveWidget::setParameters(const SkyPerspectiveParameters& paramet
 
     rebuildPreview();
     update();
+    if (m_colorBarWidget) {
+        if (m_parameters.colorMode == SkyColorMode::NaturalPreview) hideColorBarWindow();
+        else m_colorBarWidget->update();
+    }
 }
 
 // 功能：返回当前已经规范化后的渲染参数。
@@ -746,9 +969,15 @@ double SkyPerspectiveWidget::toneMappedValue(double value, double referenceValue
     if (value <= 0.0 || referenceValue <= 0.0)
         return 0.0;
 
-    const double mapped = 1.0 - std::exp(-m_parameters.exposure * value / referenceValue);
-
-    return clamp(std::pow(clamp(mapped, 0.0, 1.0), 1.0 / m_parameters.gamma), 0.0, 1.0);
+    // Scalar palettes use an explicit Linear/Log scale like Speos. Exposure and gamma
+    // remain display controls and are applied after the physical normalization.
+    double scaled = m_parameters.exposure * value / referenceValue;
+    if (m_colorBarLogScale) {
+        // Three-decade logarithmic compression: 0 -> 0, reference -> 1.
+        scaled = std::log10(1.0 + 999.0 * std::max(0.0, scaled)) / 3.0;
+    }
+    scaled = clamp(scaled, 0.0, 1.0);
+    return clamp(std::pow(scaled, 1.0 / m_parameters.gamma), 0.0, 1.0);
 }
 
 // 功能：根据 CIE 类型估计自然预览的晴朗程度。
@@ -1436,35 +1665,15 @@ void SkyPerspectiveWidget::paintEvent(QPaintEvent*)
         painter.drawText(12, 43, QString("Weather: %1") .arg(m_parameters.weather.description));
     }
 
-    if (m_colorBarVisible)
-        drawColorBar(painter);
+    drawEyedropperOverlay(painter);
 }
 
-// 功能：返回当前悬浮 Colorbar 面板区域。
-QRect SkyPerspectiveWidget::colorBarRect() const
-{
-    const int panelWidth = 168;
-    const int panelHeight = std::min(390, std::max(250, height() - 28));
-    return QRect(std::max(8, width() - panelWidth - 12), 12, panelWidth, panelHeight);
-}
-
-// 功能：返回 Colorbar 关闭按钮区域。
-QRect SkyPerspectiveWidget::colorBarCloseRect() const
-{
-    const QRect panel = colorBarRect();
-    return QRect(panel.right() - 24, panel.top() + 7, 17, 17);
-}
-
-// 功能：返回 Colorbar 标题及单位。
 QString SkyPerspectiveWidget::colorBarTitle() const
 {
     switch (m_parameters.measurementType) {
-    case SkyMeasurementType::Photometric:
-        return QString::fromUtf8("luminance (cd/m²)");
-    case SkyMeasurementType::Radiometric:
-        return QString::fromUtf8("radiance (W/(m²·sr))");
-    case SkyMeasurementType::Colorimetric:
-        return QString::fromUtf8("colorimetric Y");
+    case SkyMeasurementType::Photometric: return QString::fromUtf8("luminance (cd/m²)");
+    case SkyMeasurementType::Radiometric: return QString::fromUtf8("radiance (W/(m²·sr))");
+    case SkyMeasurementType::Colorimetric: return QString::fromUtf8("colorimetric Y");
     case SkyMeasurementType::Spectral:
         if (m_parameters.spectralDisplayAllWavelengths)
             return QString::fromUtf8("spectral radiance (W/(m²·sr))");
@@ -1473,100 +1682,124 @@ QString SkyPerspectiveWidget::colorBarTitle() const
     return QString::fromUtf8("value");
 }
 
-// 功能：返回当前色标模式的 0~1 颜色。
 QColor SkyPerspectiveWidget::colorBarColor(double normalized) const
 {
     normalized = clamp(normalized, 0.0, 1.0);
     switch (m_parameters.colorMode) {
-    case SkyColorMode::BlackToWhiteColor:
-        return blackToWhiteColor(normalized);
-    case SkyColorMode::WhiteToBlackColor:
-        return whiteToBlackColor(normalized);
-    case SkyColorMode::BlueToRed:
-        return blueToRedColor(normalized);
-    case SkyColorMode::RedToBlue:
-        return redToBlueColor(normalized);
-    case SkyColorMode::FalseColor:
-        return falseColor(normalized);
-    case SkyColorMode::GrayscaleLuminance:
-        return QColor::fromRgbF(normalized, normalized, normalized);
+    case SkyColorMode::BlackToWhiteColor: return blackToWhiteColor(normalized);
+    case SkyColorMode::WhiteToBlackColor: return whiteToBlackColor(normalized);
+    case SkyColorMode::BlueToRed: return blueToRedColor(normalized);
+    case SkyColorMode::RedToBlue: return redToBlueColor(normalized);
+    case SkyColorMode::FalseColor: return falseColor(normalized);
+    case SkyColorMode::GrayscaleLuminance: return QColor::fromRgbF(normalized, normalized, normalized);
     case SkyColorMode::NaturalPreview:
-    default:
-        return QColor::fromRgbF(normalized, normalized, normalized);
+    default: return QColor::fromRgbF(normalized, normalized, normalized);
     }
 }
 
-// 功能：绘制与附件 Speos 形式相近的悬浮 Colorbar。
-void SkyPerspectiveWidget::drawColorBar(QPainter& painter)
+// 功能：反解色条显示位置对应的物理值，保证 hover/tick 与 Linear/Log + Exposure/Gamma 一致。
+double SkyPerspectiveWidget::colorBarValueFromNormalized(double normalized) const
+{
+    normalized = clamp(normalized, 0.0, 1.0);
+    const double gamma = std::max(0.1, m_parameters.gamma);
+    double scaled = std::pow(normalized, gamma);
+    if (m_colorBarLogScale)
+        scaled = (std::pow(10.0, 3.0 * scaled) - 1.0) / 999.0;
+    const double exposure = std::max(0.001, m_parameters.exposure);
+    return std::max(0.0, m_lastColorBarMaximum) * scaled / exposure;
+}
+
+QString SkyPerspectiveWidget::formatMeasurementValue(double value) const
+{
+    const double a = std::abs(value);
+    if ((a > 0.0 && a < 1.0e-3) || a >= 1.0e6)
+        return QString::number(value, 'e', 3);
+    if (a >= 10000.0) return QString::number(value, 'f', 1);
+    if (a >= 100.0) return QString::number(value, 'f', 2);
+    if (a >= 1.0) return QString::number(value, 'f', 3);
+    return QString::number(value, 'g', 5);
+}
+
+// 功能：重新计算指定屏幕像素处的物理测量值；用于吸管，不从伪彩色 RGB 反推。
+bool SkyPerspectiveWidget::measurementValueAtWidgetPoint(const QPoint& point, double& value) const
+{
+    if (!rect().contains(point) || width() <= 0 || height() <= 0)
+        return false;
+    QVector3D direction;
+    const QVector3D sphereOriginWorld = m_parameters.useFiniteSkySphere ? cameraOriginWorld() : QVector3D();
+    if (!sampleDirectionForPixel(point.x(), point.y(), width(), height(), sphereOriginWorld, direction))
+        return false;
+    if (worldToSky(direction).z() <= 0.0f)
+        return false;
+
+    const double diffuseSourceScale = absoluteScale();
+    const SpectralConversion spectral = buildSpectralConversion(m_parameters);
+    const bool includeDiffuse = m_parameters.measurementLayer != SkyMeasurementLayer::DirectSunOnly;
+    const bool includeDirect = m_parameters.measurementLayer != SkyMeasurementLayer::DiffuseSkyOnly;
+
+    double sourceValue = includeDiffuse ? relativeSkyValue(direction) * diffuseSourceScale : 0.0;
+    if (includeDirect) {
+        const QVector3D sun = m_parameters.sunDirection.normalized();
+        const QVector3D sunLocal = worldToSky(sun);
+        if (sunLocal.z() > 0.0f) {
+            const double radius = m_parameters.sunAngularRadiusDeg * kDegToRad;
+            const double solidAngle = 2.0 * kPi * (1.0 - std::cos(radius));
+            const double effectiveDirectNormal = m_parameters.directNormalValue * atmosphericAttenuation();
+            if (solidAngle > 1.0e-12 && QVector3D::dotProduct(direction, sun) >= std::cos(radius))
+                sourceValue += effectiveDirectNormal / solidAngle;
+        }
+    }
+    value = convertSourceValue(sourceValue, m_parameters, spectral);
+    return std::isfinite(value);
+}
+
+// 功能：Colorbar 已独立为顶层浮动窗口；PerspectiveWidget 仅绘制吸管十字线和值。
+void SkyPerspectiveWidget::drawEyedropperOverlay(QPainter& painter)
+{
+    if (!m_eyedropperEnabled || !m_eyedropperValid)
+        return;
+
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    const QPoint p = m_eyedropperPos;
+    painter.setPen(QPen(Qt::white, 2.0));
+    painter.drawLine(p.x() - 8, p.y(), p.x() + 8, p.y());
+    painter.drawLine(p.x(), p.y() - 8, p.x(), p.y() + 8);
+    painter.setPen(QPen(Qt::black, 1.0));
+    painter.drawEllipse(p, 5, 5);
+    const QString text = formatMeasurementValue(m_eyedropperValue);
+    QRect bubble(p.x() + 12, p.y() - 13, 92, 25);
+    if (bubble.right() > width() - 3) bubble.moveRight(p.x() - 12);
+    if (bubble.bottom() > height() - 3) bubble.moveBottom(height() - 3);
+    painter.setBrush(QColor(255, 255, 225, 235));
+    painter.drawRoundedRect(bubble, 3, 3);
+    painter.drawText(bubble, Qt::AlignCenter, text);
+    painter.restore();
+}
+
+void SkyPerspectiveWidget::showColorBarWindow()
 {
     if (m_parameters.colorMode == SkyColorMode::NaturalPreview)
         return;
 
-    const QRect panel = colorBarRect();
-    const QRect closeRect = colorBarCloseRect();
-
-    painter.save();
-    painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setPen(QPen(QColor(105, 105, 105), 1.0));
-    painter.setBrush(QColor(235, 235, 235, 242));
-    painter.drawRoundedRect(panel, 3.0, 3.0);
-
-    painter.setPen(QColor(25, 25, 25));
-    QFont titleFont = painter.font();
-    titleFont.setPointSizeF(std::max(8.0, titleFont.pointSizeF()));
-    painter.setFont(titleFont);
-    painter.drawText(QRect(panel.left() + 8, panel.top() + 6, panel.width() - 40, 21),
-                     Qt::AlignLeft | Qt::AlignVCenter, colorBarTitle());
-
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(181, 65, 60));
-    painter.drawRect(closeRect);
-    painter.setPen(Qt::white);
-    painter.drawText(closeRect, Qt::AlignCenter, QString::fromUtf8("×"));
-
-    const int titleBottom = panel.top() + 34;
-    const int bottomMargin = 18;
-    const int barHeight = std::max(150, panel.bottom() - titleBottom - bottomMargin);
-    const QRect barRect(panel.left() + 13, titleBottom + 8, 49, barHeight - 12);
-
-    // 逐行采样，确保 Colorbar 与实际 color mode 完全共用同一映射。
-    for (int yy = 0; yy < barRect.height(); ++yy) {
-        const double n = 1.0 - static_cast<double>(yy) / std::max(1, barRect.height() - 1);
-        painter.setPen(colorBarColor(n));
-        painter.drawLine(barRect.left(), barRect.top() + yy, barRect.right(), barRect.top() + yy);
+    if (!m_colorBarWidget) {
+        m_colorBarWidget = new PerspectiveColorBarWidget(this);
+        // 初次显示默认停靠在 PerspectiveWidget 右侧外部；之后用户拖动的位置由窗口自身保留。
+        const QPoint outside = mapToGlobal(QPoint(width() + 8, 0));
+        m_colorBarWidget->move(outside);
     }
-    painter.setPen(QColor(75, 75, 75));
-    painter.setBrush(Qt::NoBrush);
-    painter.drawRect(barRect);
+    m_colorBarVisible = true;
+    m_colorBarWidget->show();
+    m_colorBarWidget->raise();
+    m_colorBarWidget->activateWindow();
+    m_colorBarWidget->update();
+}
 
-    const double maxValue = std::max(0.0, m_lastColorBarMaximum);
-    const int tickCount = 10;
-    QFont tickFont = painter.font();
-    tickFont.setPointSizeF(std::max(7.0, tickFont.pointSizeF() - 1.0));
-    painter.setFont(tickFont);
-
-    for (int i = 0; i < tickCount; ++i) {
-        const double f = static_cast<double>(i) / (tickCount - 1);
-        const int y = barRect.top() + static_cast<int>(std::round(f * (barRect.height() - 1)));
-        const double value = maxValue * (1.0 - f);
-        painter.setPen(QColor(50, 50, 50));
-        painter.drawLine(barRect.right() + 1, y, barRect.right() + 8, y);
-
-        QString label;
-        if (std::abs(value) >= 10000.0)
-            label = QString::number(value, 'f', 1);
-        else if (std::abs(value) >= 100.0)
-            label = QString::number(value, 'f', 2);
-        else if (std::abs(value) >= 1.0)
-            label = QString::number(value, 'f', 3);
-        else
-            label = QString::number(value, 'g', 4);
-
-        painter.drawText(QRect(barRect.right() + 11, y - 9, panel.right() - barRect.right() - 15, 18),
-                         Qt::AlignLeft | Qt::AlignVCenter, label);
-    }
-
-    painter.restore();
+void SkyPerspectiveWidget::hideColorBarWindow()
+{
+    m_colorBarVisible = false;
+    if (m_colorBarWidget)
+        m_colorBarWidget->hide();
 }
 
 // 功能：推进雨雪粒子动画时间并触发重绘。
@@ -1585,42 +1818,54 @@ void SkyPerspectiveWidget::resizeEvent(QResizeEvent* event)
     rebuildPreview();
 }
 
-// 功能：记录导航相机拖拽起点。
+// 功能：记录导航相机拖拽起点；Colorbar 内部交互由独立浮动窗口自己处理。
 void SkyPerspectiveWidget::mousePressEvent(QMouseEvent* event)
 {
-    // 点击悬浮 Colorbar 的 X 立即隐藏；不销毁主视图，右击可再次显示。
-    if (event->button() == Qt::LeftButton && m_colorBarVisible && colorBarCloseRect().contains(event->pos())) {
-        m_colorBarVisible = false;
+    // With eyedropper enabled, clicking the Perspective image pins/updates a physical sample.
+    if (event->button() == Qt::LeftButton && m_eyedropperEnabled) {
+        double v = 0.0;
+        m_eyedropperValid = measurementValueAtWidgetPoint(event->pos(), v);
+        if (m_eyedropperValid) {
+            m_eyedropperPos = event->pos();
+            m_eyedropperValue = v;
+        }
         update();
+        if (m_colorBarWidget) m_colorBarWidget->update();
         event->accept();
         return;
     }
 
-    if (m_parameters.useSensorFrameProjection) {
-        event->ignore();
-        return;
-    }
-
+    if (m_parameters.useSensorFrameProjection) { event->ignore(); return; }
     if (event->button() == Qt::LeftButton) {
         m_lastMousePosition = event->pos();
         event->accept();
         return;
     }
-
     QWidget::mousePressEvent(event);
 }
 
-// 功能：右击弹出 Colorbar 显示/隐藏菜单。
+// 功能：右击弹出 Colorbar/吸管/Linear-Log 菜单。
 void SkyPerspectiveWidget::contextMenuEvent(QContextMenuEvent* event)
 {
     QMenu menu(this);
     const bool scalarPalette = m_parameters.colorMode != SkyColorMode::NaturalPreview;
-
     QAction* showAction = menu.addAction(tr("显示 Colorbar"));
     showAction->setCheckable(true);
-    showAction->setChecked(m_colorBarVisible);
+    showAction->setChecked(m_colorBarVisible && m_colorBarWidget && m_colorBarWidget->isVisible());
     showAction->setEnabled(scalarPalette);
-
+    QAction* eyeAction = menu.addAction(tr("吸管取值"));
+    eyeAction->setCheckable(true);
+    eyeAction->setChecked(m_eyedropperEnabled);
+    eyeAction->setEnabled(scalarPalette);
+    menu.addSeparator();
+    QAction* linearAction = menu.addAction(tr("Linear"));
+    linearAction->setCheckable(true);
+    linearAction->setChecked(!m_colorBarLogScale);
+    linearAction->setEnabled(scalarPalette);
+    QAction* logAction = menu.addAction(tr("Log"));
+    logAction->setCheckable(true);
+    logAction->setChecked(m_colorBarLogScale);
+    logAction->setEnabled(scalarPalette);
     if (!scalarPalette) {
         QAction* note = menu.addAction(tr("Natural preview 没有标量 Colorbar"));
         note->setEnabled(false);
@@ -1628,45 +1873,81 @@ void SkyPerspectiveWidget::contextMenuEvent(QContextMenuEvent* event)
 
     QAction* chosen = menu.exec(event->globalPos());
     if (chosen == showAction) {
-        m_colorBarVisible = showAction->isChecked();
-        update();
+        if (showAction->isChecked()) showColorBarWindow();
+        else hideColorBarWindow();
     }
+    else if (chosen == eyeAction) {
+        m_eyedropperEnabled = eyeAction->isChecked();
+        if (!m_eyedropperEnabled) m_eyedropperValid = false;
+    }
+    else if (chosen == linearAction && m_colorBarLogScale) {
+        m_colorBarLogScale = false;
+        rebuildPreview();
+    }
+    else if (chosen == logAction && !m_colorBarLogScale) {
+        m_colorBarLogScale = true;
+        rebuildPreview();
+    }
+    update();
+    if (m_colorBarWidget) m_colorBarWidget->update();
     event->accept();
 }
 
-// 功能：左键拖拽时调整相机方位角与仰角。
+// 功能：处理 Perspective 图像上的吸管 hover 和相机拖拽；Colorbar hover/拖动由独立窗口处理。
 void SkyPerspectiveWidget::mouseMoveEvent(QMouseEvent* event)
 {
-    if (m_parameters.useSensorFrameProjection) {
-        event->ignore();
-        return;
+    bool changedOverlay = false;
+    if (m_eyedropperEnabled) {
+        double v = 0.0;
+        const bool valid = measurementValueAtWidgetPoint(event->pos(), v);
+        if (valid) {
+            m_eyedropperPos = event->pos();
+            m_eyedropperValue = v;
+        }
+        if (valid != m_eyedropperValid || valid) {
+            m_eyedropperValid = valid;
+            changedOverlay = true;
+        }
+    }
+    if (changedOverlay) {
+        update();
+        if (m_colorBarWidget) m_colorBarWidget->update();
     }
 
-    if (!(event->buttons() & Qt::LeftButton))
-        return;
+    if (m_parameters.useSensorFrameProjection) { event->accept(); return; }
+    if (!(event->buttons() & Qt::LeftButton)) { event->accept(); return; }
 
     const QPoint delta = event->pos() - m_lastMousePosition;
     m_lastMousePosition = event->pos();
-
     m_parameters.cameraAzimuthDeg -= delta.x() * 0.25;
-    if (m_parameters.localCamera)
-    {
+    if (m_parameters.localCamera) {
         m_parameters.cameraAzimuthDeg = clamp(m_parameters.cameraAzimuthDeg, -180.0, 180.0);
         m_parameters.cameraPitchDeg = clamp(m_parameters.cameraPitchDeg + delta.y() * 0.20, -180.0, 180.0);
-    }
-    else
-    {
-        while (m_parameters.cameraAzimuthDeg < 0.0)
-            m_parameters.cameraAzimuthDeg += 360.0;
-        while (m_parameters.cameraAzimuthDeg >= 360.0)
-            m_parameters.cameraAzimuthDeg -= 360.0;
+    } else {
+        while (m_parameters.cameraAzimuthDeg < 0.0) m_parameters.cameraAzimuthDeg += 360.0;
+        while (m_parameters.cameraAzimuthDeg >= 360.0) m_parameters.cameraAzimuthDeg -= 360.0;
         m_parameters.cameraPitchDeg = clamp(m_parameters.cameraPitchDeg + delta.y() * 0.20, -89.0, 89.0);
     }
-
     rebuildPreview();
     update();
+    emit cameraChanged(m_parameters.cameraAzimuthDeg, m_parameters.cameraPitchDeg,
+                       m_parameters.cameraRollDeg, m_parameters.horizontalFovDeg,
+                       m_parameters.verticalFovDeg);
+}
 
-    emit cameraChanged(m_parameters.cameraAzimuthDeg, m_parameters.cameraPitchDeg, m_parameters.cameraRollDeg, m_parameters.horizontalFovDeg, m_parameters.verticalFovDeg);
+void SkyPerspectiveWidget::mouseReleaseEvent(QMouseEvent* event)
+{
+    QWidget::mouseReleaseEvent(event);
+}
+
+void SkyPerspectiveWidget::leaveEvent(QEvent* event)
+{
+    if (m_eyedropperEnabled) {
+        m_eyedropperValid = false;
+        update();
+        if (m_colorBarWidget) m_colorBarWidget->update();
+    }
+    QWidget::leaveEvent(event);
 }
 
 // 功能：鼠标滚轮调整垂直视场角。

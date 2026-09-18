@@ -14,6 +14,7 @@
 class QMouseEvent;
 class QContextMenuEvent;
 class QPaintEvent;
+class QEvent;
 class QPainter;
 class QResizeEvent;
 class QRect;
@@ -22,6 +23,7 @@ class QString;
 class QTimer;
 class QWheelEvent;
 class EnvironmentLight;
+class PerspectiveColorBarWidget;
 struct SkySceneState;
 
 // ================================================================
@@ -217,8 +219,14 @@ protected:
     // 功能：右击弹出显示/隐藏 Colorbar 菜单。
     void contextMenuEvent(QContextMenuEvent* event) override;
 
-    // 功能：左键拖拽时调整相机方位角与仰角。
+    // 功能：左键拖拽时调整相机方位角与仰角，或拖动 Colorbar/执行吸管取值。
     void mouseMoveEvent(QMouseEvent* event) override;
+
+    // 功能：结束 Colorbar 拖动。
+    void mouseReleaseEvent(QMouseEvent* event) override;
+
+    // 功能：鼠标离开时清除悬浮读数。
+    void leaveEvent(QEvent* event) override;
 
     // 功能：鼠标滚轮调整垂直视场角。
     void wheelEvent(QWheelEvent* event) override;
@@ -288,8 +296,12 @@ private:
     // 功能：判断当前天气是否需要启动粒子动画。
     bool weatherNeedsAnimation() const;
 
-    // 功能：绘制 Speos 风格悬浮 Colorbar；仅影响 Display，不写入导出 PNG。
-    void drawColorBar(QPainter& painter);
+    // 功能：绘制吸管十字线和值；Colorbar 本体由独立浮动窗口绘制。
+    void drawEyedropperOverlay(QPainter& painter);
+
+    // 功能：创建/显示或隐藏独立于 PerspectiveWidget 的浮动 Colorbar。
+    void showColorBarWindow();
+    void hideColorBarWindow();
 
     // 功能：返回当前颜色模式对应的色标颜色。
     QColor colorBarColor(double normalized) const;
@@ -297,9 +309,12 @@ private:
     // 功能：返回 Colorbar 标题/单位。
     QString colorBarTitle() const;
 
-    // 功能：返回当前 Colorbar 面板和关闭按钮区域。
-    QRect colorBarRect() const;
-    QRect colorBarCloseRect() const;
+    // 功能：把 Colorbar 归一化位置反解为真实物理值，并格式化显示。
+    double colorBarValueFromNormalized(double normalized) const;
+    QString formatMeasurementValue(double value) const;
+
+    // 功能：在当前 widget 像素处重新计算传感器标量，供吸管读取。
+    bool measurementValueAtWidgetPoint(const QPoint& point, double& value) const;
 
     // 功能：把 0~1 标量映射为伪彩色。
     static QColor falseColor(double normalized);
@@ -318,15 +333,23 @@ private:
     static QVector3D mix(const QVector3D& a, const QVector3D& b, double t);
 
 private:
+    friend class PerspectiveColorBarWidget;
+
     SkyPerspectiveParameters m_parameters;
     QImage m_preview;
     QPoint m_lastMousePosition;
     QTimer* m_weatherTimer = nullptr;
     double m_animationSeconds = 0.0;
 
-    // Display-only floating colorbar state. 关闭按钮仅隐藏；下次右击可重新显示。
+    // Display-only floating colorbar state. Colorbar 是独立顶层 Tool 窗口，可浮动在 PerspectiveWidget 外。
     bool m_colorBarVisible = false;
     mutable double m_lastColorBarMaximum = 1.0;
+    bool m_colorBarLogScale = false;
+    PerspectiveColorBarWidget* m_colorBarWidget = nullptr;
+    bool m_eyedropperEnabled = false;
+    bool m_eyedropperValid = false;
+    QPoint m_eyedropperPos;
+    double m_eyedropperValue = 0.0;
 };
 
 #endif // SKYPERSPECTIVEWIDGET_H
