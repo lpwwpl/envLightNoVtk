@@ -364,6 +364,11 @@ void CIEWidget::setupUI()
 	m_colorModeCombo->addItem(tr("自然天空预览"), static_cast<int>(SkyColorMode::NaturalPreview));
 	m_colorModeCombo->addItem(tr("科学伪彩"), static_cast<int>(SkyColorMode::FalseColor));
 	m_colorModeCombo->addItem(tr("亮度灰度"), static_cast<int>(SkyColorMode::GrayscaleLuminance));
+	m_colorModeCombo->addItem(tr("Black to white (color)"), static_cast<int>(SkyColorMode::BlackToWhiteColor));
+	m_colorModeCombo->addItem(tr("White to black (color)"), static_cast<int>(SkyColorMode::WhiteToBlackColor));
+	m_colorModeCombo->addItem(tr("Blue to red"), static_cast<int>(SkyColorMode::BlueToRed));
+	m_colorModeCombo->addItem(tr("Red to blue"), static_cast<int>(SkyColorMode::RedToBlue));
+	m_colorModeCombo->setToolTip(tr("颜色映射同时用于 Display 预览和 Export PNG。"));
 
 	m_toneMapCombo = new QComboBox;
 

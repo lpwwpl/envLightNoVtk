@@ -12,9 +12,11 @@
 #include "WeatherEffects.h"
 
 class QMouseEvent;
+class QContextMenuEvent;
 class QPaintEvent;
 class QPainter;
 class QResizeEvent;
+class QRect;
 class QRectF;
 class QString;
 class QTimer;
@@ -39,7 +41,12 @@ enum class SkyAbsoluteScaleMode {
 enum class SkyColorMode {
     GrayscaleLuminance,
     FalseColor,
-    NaturalPreview
+    NaturalPreview,
+    // Speos-style scalar palettes used by both on-screen Display and PNG Export.
+    BlackToWhiteColor,
+    WhiteToBlackColor,
+    BlueToRed,
+    RedToBlue
 };
 
 // ================================================================
@@ -207,6 +214,9 @@ protected:
     // 功能：记录导航相机拖拽起点。
     void mousePressEvent(QMouseEvent* event) override;
 
+    // 功能：右击弹出显示/隐藏 Colorbar 菜单。
+    void contextMenuEvent(QContextMenuEvent* event) override;
+
     // 功能：左键拖拽时调整相机方位角与仰角。
     void mouseMoveEvent(QMouseEvent* event) override;
 
@@ -278,8 +288,25 @@ private:
     // 功能：判断当前天气是否需要启动粒子动画。
     bool weatherNeedsAnimation() const;
 
+    // 功能：绘制 Speos 风格悬浮 Colorbar；仅影响 Display，不写入导出 PNG。
+    void drawColorBar(QPainter& painter);
+
+    // 功能：返回当前颜色模式对应的色标颜色。
+    QColor colorBarColor(double normalized) const;
+
+    // 功能：返回 Colorbar 标题/单位。
+    QString colorBarTitle() const;
+
+    // 功能：返回当前 Colorbar 面板和关闭按钮区域。
+    QRect colorBarRect() const;
+    QRect colorBarCloseRect() const;
+
     // 功能：把 0~1 标量映射为伪彩色。
     static QColor falseColor(double normalized);
+    static QColor blackToWhiteColor(double normalized);
+    static QColor whiteToBlackColor(double normalized);
+    static QColor blueToRedColor(double normalized);
+    static QColor redToBlueColor(double normalized);
 
     // 功能：把数值限制在指定闭区间。
     static double clamp(double value, double low, double high);
@@ -296,6 +323,10 @@ private:
     QPoint m_lastMousePosition;
     QTimer* m_weatherTimer = nullptr;
     double m_animationSeconds = 0.0;
+
+    // Display-only floating colorbar state. 关闭按钮仅隐藏；下次右击可重新显示。
+    bool m_colorBarVisible = false;
+    mutable double m_lastColorBarMaximum = 1.0;
 };
 
 #endif // SKYPERSPECTIVEWIDGET_H

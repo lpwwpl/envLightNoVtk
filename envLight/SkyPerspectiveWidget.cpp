@@ -3,6 +3,8 @@
 #include "environment_light.h"
 
 #include <QMouseEvent>
+#include <QContextMenuEvent>
+#include <QMenu>
 #include <QPainter>
 #include <QPainterPath>
 #include <QResizeEvent>
@@ -988,6 +990,54 @@ QColor SkyPerspectiveWidget::falseColor(double value)
     return QColor::fromRgbF(red, green, blue);
 }
 
+// Speos-like "Black to white (color)" palette:
+// black -> blue -> cyan -> green -> yellow -> red -> white.
+QColor SkyPerspectiveWidget::blackToWhiteColor(double value)
+{
+    const double t = clamp(value, 0.0, 1.0);
+    struct Stop { double p; int r; int g; int b; };
+    static const Stop stops[] = {
+        {0.00,   0,   0,   0},
+        {0.10,   0,   0, 150},
+        {0.25,   0,  70, 255},
+        {0.40,   0, 220, 255},
+        {0.55,   0, 235,  60},
+        {0.70, 245, 245,   0},
+        {0.85, 255,  35,   0},
+        {1.00, 255, 255, 255}
+    };
+    for (size_t i = 1; i < sizeof(stops) / sizeof(stops[0]); ++i) {
+        if (t <= stops[i].p) {
+            const Stop& a = stops[i - 1];
+            const Stop& b = stops[i];
+            const double u = (t - a.p) / (b.p - a.p);
+            return QColor(
+                static_cast<int>(std::lround(a.r + u * (b.r - a.r))),
+                static_cast<int>(std::lround(a.g + u * (b.g - a.g))),
+                static_cast<int>(std::lround(a.b + u * (b.b - a.b))));
+        }
+    }
+    return QColor(255, 255, 255);
+}
+
+QColor SkyPerspectiveWidget::whiteToBlackColor(double value)
+{
+    return blackToWhiteColor(1.0 - clamp(value, 0.0, 1.0));
+}
+
+// Speos-like two-endpoint palette. A smooth RGB interpolation naturally
+// passes through violet/magenta between blue (low) and red (high).
+QColor SkyPerspectiveWidget::blueToRedColor(double value)
+{
+    const double t = clamp(value, 0.0, 1.0);
+    return QColor::fromRgbF(t, 0.0, 1.0 - t);
+}
+
+QColor SkyPerspectiveWidget::redToBlueColor(double value)
+{
+    return blueToRedColor(1.0 - clamp(value, 0.0, 1.0));
+}
+
 // 功能：用 CIE 标量亮度生成不参与数值计算的自然天空预览颜色。
 QColor SkyPerspectiveWidget::naturalPreviewColor(const QVector3D& direction, double normalizedBrightness, double sunCosine, double directStrength) const
 {
@@ -1105,6 +1155,9 @@ QImage SkyPerspectiveWidget::renderBaseImage(const QSize& imageSize) const
     const double referenceValue = m_parameters.toneMapMode == SkyToneMapMode::AutoPeak ? std::max(1.0e-12, autoPeak) : std::max(1.0e-12, m_parameters.displayReferenceValue);
     const double previewReferenceValue = m_parameters.toneMapMode == SkyToneMapMode::AutoPeak ? std::max(1.0e-12, previewDiffusePeak) : std::max(1.0e-12, m_parameters.displayReferenceValue);
 
+    // Colorbar 与当前 Display 的标尺保持一致：Fixed 用 Reference，AutoPeak 用本帧峰值。
+    m_lastColorBarMaximum = referenceValue;
+
     // 80000 lx 只用于 Natural Preview 的太阳光晕显示归一化，不改变 Direct sun only 的物理数值。
     const double directStrength = clamp(effectiveDirectNormal / 80000.0, 0.0, 1.0);
 
@@ -1133,6 +1186,18 @@ QImage SkyPerspectiveWidget::renderBaseImage(const QSize& imageSize) const
             QColor color;
             switch (m_parameters.colorMode)
             {
+            case SkyColorMode::BlackToWhiteColor:
+                color = blackToWhiteColor(normalized);
+                break;
+            case SkyColorMode::WhiteToBlackColor:
+                color = whiteToBlackColor(normalized);
+                break;
+            case SkyColorMode::BlueToRed:
+                color = blueToRedColor(normalized);
+                break;
+            case SkyColorMode::RedToBlue:
+                color = redToBlueColor(normalized);
+                break;
             case SkyColorMode::FalseColor:
                 color = falseColor(normalized);
                 break;
@@ -1370,6 +1435,138 @@ void SkyPerspectiveWidget::paintEvent(QPaintEvent*)
     if (!m_parameters.weather.description.isEmpty()) {
         painter.drawText(12, 43, QString("Weather: %1") .arg(m_parameters.weather.description));
     }
+
+    if (m_colorBarVisible)
+        drawColorBar(painter);
+}
+
+// 功能：返回当前悬浮 Colorbar 面板区域。
+QRect SkyPerspectiveWidget::colorBarRect() const
+{
+    const int panelWidth = 168;
+    const int panelHeight = std::min(390, std::max(250, height() - 28));
+    return QRect(std::max(8, width() - panelWidth - 12), 12, panelWidth, panelHeight);
+}
+
+// 功能：返回 Colorbar 关闭按钮区域。
+QRect SkyPerspectiveWidget::colorBarCloseRect() const
+{
+    const QRect panel = colorBarRect();
+    return QRect(panel.right() - 24, panel.top() + 7, 17, 17);
+}
+
+// 功能：返回 Colorbar 标题及单位。
+QString SkyPerspectiveWidget::colorBarTitle() const
+{
+    switch (m_parameters.measurementType) {
+    case SkyMeasurementType::Photometric:
+        return QString::fromUtf8("luminance (cd/m²)");
+    case SkyMeasurementType::Radiometric:
+        return QString::fromUtf8("radiance (W/(m²·sr))");
+    case SkyMeasurementType::Colorimetric:
+        return QString::fromUtf8("colorimetric Y");
+    case SkyMeasurementType::Spectral:
+        if (m_parameters.spectralDisplayAllWavelengths)
+            return QString::fromUtf8("spectral radiance (W/(m²·sr))");
+        return QString::fromUtf8("spectral radiance (W/(m²·sr·nm))");
+    }
+    return QString::fromUtf8("value");
+}
+
+// 功能：返回当前色标模式的 0~1 颜色。
+QColor SkyPerspectiveWidget::colorBarColor(double normalized) const
+{
+    normalized = clamp(normalized, 0.0, 1.0);
+    switch (m_parameters.colorMode) {
+    case SkyColorMode::BlackToWhiteColor:
+        return blackToWhiteColor(normalized);
+    case SkyColorMode::WhiteToBlackColor:
+        return whiteToBlackColor(normalized);
+    case SkyColorMode::BlueToRed:
+        return blueToRedColor(normalized);
+    case SkyColorMode::RedToBlue:
+        return redToBlueColor(normalized);
+    case SkyColorMode::FalseColor:
+        return falseColor(normalized);
+    case SkyColorMode::GrayscaleLuminance:
+        return QColor::fromRgbF(normalized, normalized, normalized);
+    case SkyColorMode::NaturalPreview:
+    default:
+        return QColor::fromRgbF(normalized, normalized, normalized);
+    }
+}
+
+// 功能：绘制与附件 Speos 形式相近的悬浮 Colorbar。
+void SkyPerspectiveWidget::drawColorBar(QPainter& painter)
+{
+    if (m_parameters.colorMode == SkyColorMode::NaturalPreview)
+        return;
+
+    const QRect panel = colorBarRect();
+    const QRect closeRect = colorBarCloseRect();
+
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setPen(QPen(QColor(105, 105, 105), 1.0));
+    painter.setBrush(QColor(235, 235, 235, 242));
+    painter.drawRoundedRect(panel, 3.0, 3.0);
+
+    painter.setPen(QColor(25, 25, 25));
+    QFont titleFont = painter.font();
+    titleFont.setPointSizeF(std::max(8.0, titleFont.pointSizeF()));
+    painter.setFont(titleFont);
+    painter.drawText(QRect(panel.left() + 8, panel.top() + 6, panel.width() - 40, 21),
+                     Qt::AlignLeft | Qt::AlignVCenter, colorBarTitle());
+
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(181, 65, 60));
+    painter.drawRect(closeRect);
+    painter.setPen(Qt::white);
+    painter.drawText(closeRect, Qt::AlignCenter, QString::fromUtf8("×"));
+
+    const int titleBottom = panel.top() + 34;
+    const int bottomMargin = 18;
+    const int barHeight = std::max(150, panel.bottom() - titleBottom - bottomMargin);
+    const QRect barRect(panel.left() + 13, titleBottom + 8, 49, barHeight - 12);
+
+    // 逐行采样，确保 Colorbar 与实际 color mode 完全共用同一映射。
+    for (int yy = 0; yy < barRect.height(); ++yy) {
+        const double n = 1.0 - static_cast<double>(yy) / std::max(1, barRect.height() - 1);
+        painter.setPen(colorBarColor(n));
+        painter.drawLine(barRect.left(), barRect.top() + yy, barRect.right(), barRect.top() + yy);
+    }
+    painter.setPen(QColor(75, 75, 75));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawRect(barRect);
+
+    const double maxValue = std::max(0.0, m_lastColorBarMaximum);
+    const int tickCount = 10;
+    QFont tickFont = painter.font();
+    tickFont.setPointSizeF(std::max(7.0, tickFont.pointSizeF() - 1.0));
+    painter.setFont(tickFont);
+
+    for (int i = 0; i < tickCount; ++i) {
+        const double f = static_cast<double>(i) / (tickCount - 1);
+        const int y = barRect.top() + static_cast<int>(std::round(f * (barRect.height() - 1)));
+        const double value = maxValue * (1.0 - f);
+        painter.setPen(QColor(50, 50, 50));
+        painter.drawLine(barRect.right() + 1, y, barRect.right() + 8, y);
+
+        QString label;
+        if (std::abs(value) >= 10000.0)
+            label = QString::number(value, 'f', 1);
+        else if (std::abs(value) >= 100.0)
+            label = QString::number(value, 'f', 2);
+        else if (std::abs(value) >= 1.0)
+            label = QString::number(value, 'f', 3);
+        else
+            label = QString::number(value, 'g', 4);
+
+        painter.drawText(QRect(barRect.right() + 11, y - 9, panel.right() - barRect.right() - 15, 18),
+                         Qt::AlignLeft | Qt::AlignVCenter, label);
+    }
+
+    painter.restore();
 }
 
 // 功能：推进雨雪粒子动画时间并触发重绘。
@@ -1391,12 +1588,49 @@ void SkyPerspectiveWidget::resizeEvent(QResizeEvent* event)
 // 功能：记录导航相机拖拽起点。
 void SkyPerspectiveWidget::mousePressEvent(QMouseEvent* event)
 {
+    // 点击悬浮 Colorbar 的 X 立即隐藏；不销毁主视图，右击可再次显示。
+    if (event->button() == Qt::LeftButton && m_colorBarVisible && colorBarCloseRect().contains(event->pos())) {
+        m_colorBarVisible = false;
+        update();
+        event->accept();
+        return;
+    }
+
     if (m_parameters.useSensorFrameProjection) {
         event->ignore();
         return;
     }
 
-    m_lastMousePosition = event->pos();
+    if (event->button() == Qt::LeftButton) {
+        m_lastMousePosition = event->pos();
+        event->accept();
+        return;
+    }
+
+    QWidget::mousePressEvent(event);
+}
+
+// 功能：右击弹出 Colorbar 显示/隐藏菜单。
+void SkyPerspectiveWidget::contextMenuEvent(QContextMenuEvent* event)
+{
+    QMenu menu(this);
+    const bool scalarPalette = m_parameters.colorMode != SkyColorMode::NaturalPreview;
+
+    QAction* showAction = menu.addAction(tr("显示 Colorbar"));
+    showAction->setCheckable(true);
+    showAction->setChecked(m_colorBarVisible);
+    showAction->setEnabled(scalarPalette);
+
+    if (!scalarPalette) {
+        QAction* note = menu.addAction(tr("Natural preview 没有标量 Colorbar"));
+        note->setEnabled(false);
+    }
+
+    QAction* chosen = menu.exec(event->globalPos());
+    if (chosen == showAction) {
+        m_colorBarVisible = showAction->isChecked();
+        update();
+    }
     event->accept();
 }
 

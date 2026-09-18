@@ -891,6 +891,11 @@ void StandardSkyViewer::setupUi()
     m_colorSchemeCombo->addItem(tr("Natural preview"), static_cast<int>(SkyColorMode::NaturalPreview));
     m_colorSchemeCombo->addItem(tr("Grayscale"), static_cast<int>(SkyColorMode::GrayscaleLuminance));
     m_colorSchemeCombo->addItem(tr("False color"), static_cast<int>(SkyColorMode::FalseColor));
+    m_colorSchemeCombo->addItem(tr("Black to white (color)"), static_cast<int>(SkyColorMode::BlackToWhiteColor));
+    m_colorSchemeCombo->addItem(tr("White to black (color)"), static_cast<int>(SkyColorMode::WhiteToBlackColor));
+    m_colorSchemeCombo->addItem(tr("Blue to red"), static_cast<int>(SkyColorMode::BlueToRed));
+    m_colorSchemeCombo->addItem(tr("Red to blue"), static_cast<int>(SkyColorMode::RedToBlue));
+    m_colorSchemeCombo->setToolTip(tr("Color mapping is shared by the live Display and PNG Export."));
     m_toneMapCombo = new QComboBox;
     m_toneMapCombo->addItem(tr("Fixed reference"), static_cast<int>(SkyToneMapMode::FixedReference));
     m_toneMapCombo->addItem(tr("Auto peak"), static_cast<int>(SkyToneMapMode::AutoPeak));
