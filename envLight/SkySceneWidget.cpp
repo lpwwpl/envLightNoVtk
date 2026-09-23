@@ -99,6 +99,8 @@ void SkySceneWidget::paintGL()
     drawSkySphere(mvp);
     drawWorldAxes(mvp);
     drawSkyAxesAndHorizon(mvp);
+    drawPoints({QVector3D(0.0f, 0.0f, 0.0f)}, QVector4D(0.95f, 0.95f, 0.98f, 1.0f), mvp, 9.0f);
+    drawSunPath(mvp);
     drawSun(mvp);
     drawCamera(mvp);
     paintLabels(mvp);
@@ -199,6 +201,24 @@ void SkySceneWidget::drawSkyAxesAndHorizon(const QMatrix4x4& mvp)
         horizon.push_back(point * 1.002f);
     }
     drawLines(horizon, QVector4D(0.96f, 0.88f, 0.34f, 0.92f), mvp, GL_LINE_STRIP, 2.2f);
+}
+
+
+void SkySceneWidget::drawSunPath(const QMatrix4x4& mvp)
+{
+    if (m_state.sunPathWorld.size() < 2)
+    {
+        return;
+    }
+
+    std::vector<QVector3D> path;
+    path.reserve(m_state.sunPathWorld.size());
+    for (const QVector3D& direction : m_state.sunPathWorld)
+    {
+        path.push_back(normalizedOr(direction, m_state.skyUpDirection) * static_cast<float>(m_state.sphereRadius * 1.008));
+    }
+    drawLines(path, QVector4D(1.0f, 0.62f, 0.12f, 0.92f), mvp, GL_LINE_STRIP, 2.6f);
+    drawPoints(path, QVector4D(1.0f, 0.72f, 0.18f, 0.82f), mvp, 4.0f);
 }
 
 void SkySceneWidget::drawSun(const QMatrix4x4& mvp)
@@ -338,9 +358,13 @@ void SkySceneWidget::paintLabels(const QMatrix4x4& mvp)
     drawProjectedLabel(painter, QVector3D(worldLength, 0.0f, 0.0f), tr("World E"), QColor(255, 92, 72), mvp);
     drawProjectedLabel(painter, QVector3D(0.0f, worldLength, 0.0f), tr("World N"), QColor(80, 240, 100), mvp);
     drawProjectedLabel(painter, QVector3D(0.0f, 0.0f, worldLength), tr("World U"), QColor(80, 150, 255), mvp);
-    drawProjectedLabel(painter, m_state.skyEastDirection * skyLength, tr("CIE E"), QColor(255, 165, 72), mvp);
-    drawProjectedLabel(painter, m_state.skyNorthDirection * skyLength, tr("CIE N"), QColor(72, 242, 194), mvp);
-    drawProjectedLabel(painter, m_state.skyUpDirection * skyLength, tr("CIE U"), QColor(194, 124, 255), mvp);
+    drawProjectedLabel(painter, m_state.skyEastDirection * skyLength, tr("E / 90°"), QColor(255, 165, 72), mvp);
+    drawProjectedLabel(painter, -m_state.skyEastDirection * skyLength, tr("W / 270°"), QColor(255, 165, 72), mvp);
+    drawProjectedLabel(painter, m_state.skyNorthDirection * skyLength, tr("N / 0°"), QColor(72, 242, 194), mvp);
+    drawProjectedLabel(painter, -m_state.skyNorthDirection * skyLength, tr("S / 180°"), QColor(72, 242, 194), mvp);
+    drawProjectedLabel(painter, m_state.skyUpDirection * skyLength, tr("U / Zenith"), QColor(194, 124, 255), mvp);
+    if (!m_state.observerLabel.isEmpty())
+        drawProjectedLabel(painter, QVector3D(0.0f, 0.0f, 0.0f), m_state.observerLabel, QColor(238, 240, 248), mvp);
     drawProjectedLabel(painter, m_state.sunDirectionWorld * static_cast<float>(m_state.sphereRadius * 1.015), tr("Sun"), QColor(255, 215, 68), mvp);
     drawProjectedLabel(painter, m_state.cameraOriginWorld, tr("Camera"), QColor(255, 110, 96), mvp);
     drawProjectedLabel(painter, m_state.cameraOriginWorld + cameraAxisLength * m_state.cameraXAxisWorld, tr("Xc"), QColor(255, 110, 96), mvp);
@@ -349,6 +373,10 @@ void SkySceneWidget::paintLabels(const QMatrix4x4& mvp)
     painter.setPen(QColor(220, 224, 232));
     painter.drawText(10, 18, tr("World ENU -> finite sky sphere -> CIE ENU"));
     painter.drawText(10, 36, tr("Mouse: left-drag orbit, wheel zoom"));
+    int y = 58;
+    if (!m_state.locationText.isEmpty()) { painter.drawText(10, y, m_state.locationText); y += 18; }
+    if (!m_state.timeText.isEmpty()) { painter.drawText(10, y, m_state.timeText); y += 18; }
+    if (!m_state.sunText.isEmpty()) { painter.drawText(10, y, m_state.sunText); }
 }
 
 void SkySceneWidget::drawProjectedLabel(QPainter& painter, const QVector3D& point, const QString& text, const QColor& color, const QMatrix4x4& mvp) const

@@ -24,6 +24,8 @@
 #include <QSplitter>
 #include <QTabWidget>
 #include <QVBoxLayout>
+#include <QWheelEvent>
+#include <QEvent>
 
 #include <algorithm>
 #include <cmath>
@@ -214,6 +216,8 @@ void CIEWidget::setupUI()
 	m_timeSlider = new QSlider(Qt::Horizontal);
 	m_timeSlider->setRange(0, 0);
 	m_timeSlider->setEnabled(false);
+	m_timeSlider->installEventFilter(this);
+	m_timeSlider->setToolTip(tr("鼠标滚轮每一格切换 1 小时；若 EPW 每小时有多条记录，会自动跨过对应记录数。"));
 
 	m_sliderInfo = new QLabel(tr("未加载 EPW"));
 
@@ -633,18 +637,17 @@ void CIEWidget::onLoadEPW()
 
 	m_skyWidget->setLocation(m_latitude, m_longitude, m_timeZone);
 
+	const QString region = document.location.stateProvince.isEmpty()
+		? document.location.country
+		: QString("%1, %2").arg(document.location.stateProvince, document.location.country);
+	const QString utcText = m_timeZone >= 0.0 ? QString("+%1").arg(m_timeZone, 0, 'g', 4) : QString::number(m_timeZone, 'g', 4);
 	m_locationInfo->setText(
-		QString(
-			"%1  纬度 %2°  经度 %3°  UTC%4")
-		.arg(document.location.city)
+		QString("%1, %2\nLat %3°  Lon %4°  UTC%5  Elev %6 m")
+		.arg(document.location.city, region)
 		.arg(m_latitude, 0, 'f', 4)
 		.arg(m_longitude, 0, 'f', 4)
-		.arg(
-			m_timeZone >= 0.0
-			? QString("+%1")
-			.arg(m_timeZone)
-			: QString::number(
-				m_timeZone)));
+		.arg(utcText)
+		.arg(document.location.elevation, 0, 'f', 0));
 
 	if (document.records.isEmpty())
 	{
@@ -655,10 +658,32 @@ void CIEWidget::onLoadEPW()
 	}
 
 	m_timeSlider->setRange(0, document.records.size() - 1);
+	m_timeSlider->setSingleStep(std::max(1, document.recordsPerHour));
+	m_timeSlider->setPageStep(std::max(1, document.recordsPerHour));
 	m_timeSlider->setEnabled(true);
 	m_timeSlider->setValue(0);
 
 	applyEpwRecord(document, document.records.first());
+}
+
+bool CIEWidget::eventFilter(QObject* watched, QEvent* event)
+{
+    if (watched == m_timeSlider && event->type() == QEvent::Wheel && m_timeSlider && m_timeSlider->isEnabled())
+    {
+        QWheelEvent* wheel = static_cast<QWheelEvent*>(event);
+        const int delta = wheel->angleDelta().y();
+        if (delta != 0)
+        {
+            const int recordsPerHour = m_epwLoaded ? std::max(1, m_epwDocument.recordsPerHour) : 1;
+            // 向上滚动进入下一小时，向下滚动返回上一小时。一次 wheel event 严格只跨一小时。
+            const int direction = delta > 0 ? 1 : -1;
+            const int next = std::clamp(m_timeSlider->value() + direction * recordsPerHour, m_timeSlider->minimum(), m_timeSlider->maximum());
+            m_timeSlider->setValue(next);
+            wheel->accept();
+            return true;
+        }
+    }
+    return QMainWindow::eventFilter(watched, event);
 }
 
 void CIEWidget::onSliderTime(
@@ -703,35 +728,19 @@ void CIEWidget::applyEpwRecord(const EpwDocument& document, const EpwRecord& rec
 
 	m_skyWidget->setDiffuseHorizontalIrradiance(m_currentDhi);
 
+	const QVector3D sunNow = currentSunDirection();
+	const double sunAz = worldEnuAzimuthDeg(sunNow);
+	const double sunAlt = worldEnuAltitudeDeg(sunNow);
 	m_sliderInfo->setText(
-		QString(
-			"%1-%2-%3 %4:%5  中点 %6 h")
+		QString("EPW %1-%2-%3 %4:%5  |  Solar midpoint %6 h\nSun Az %7°  Alt %8°")
 		.arg(record.year)
-		.arg(
-			record.month,
-			2,
-			10,
-			QChar('0'))
-		.arg(
-			record.day,
-			2,
-			10,
-			QChar('0'))
-		.arg(
-			record.hour,
-			2,
-			10,
-			QChar('0'))
-		.arg(
-			record.minute,
-			2,
-			10,
-			QChar('0'))
-		.arg(
-			midpoint,
-			0,
-			'f',
-			2));
+		.arg(record.month, 2, 10, QChar('0'))
+		.arg(record.day, 2, 10, QChar('0'))
+		.arg(record.hour, 2, 10, QChar('0'))
+		.arg(record.minute, 2, 10, QChar('0'))
+		.arg(midpoint, 0, 'f', 2)
+		.arg(sunAz, 0, 'f', 1)
+		.arg(sunAlt, 0, 'f', 1));
 
 	updateScaleInputsFromCurrentRecord();
 	updateWeatherInputsFromCurrentRecord();
@@ -861,7 +870,58 @@ void CIEWidget::updatePerspectiveView()
         return;
 
     m_perspectiveWidget->setParameters(currentPerspectiveParameters());
-    if (m_sceneWidget) m_sceneWidget->setSceneState(m_perspectiveWidget->sceneState());
+    if (m_sceneWidget)
+    {
+        SkySceneState state = m_perspectiveWidget->sceneState();
+        state.sunPathWorld.clear();
+        state.sunPathWorld.reserve(97);
+        for (int sample = 0; sample <= 96; ++sample)
+        {
+            const double hour = 24.0 * static_cast<double>(sample) / 96.0;
+            const SSLib::Vec3f sun = SSLib::SunDirection(
+                static_cast<float>(hour), static_cast<float>(m_timeZone), m_currentDate.dayOfYear(),
+                static_cast<float>(m_latitude), static_cast<float>(m_longitude));
+            QVector3D direction(sun[0], sun[1], sun[2]);
+            if (direction.lengthSquared() > 1.0e-12f)
+            {
+                direction.normalize();
+                // 只绘制地平线以上的日轨迹，避免夜间轨迹穿过天空球造成方向误解。
+                if (direction.z() >= 0.0f)
+                    state.sunPathWorld.push_back(direction);
+            }
+        }
+
+        const QVector3D sun = currentSunDirection();
+        state.sunDirectionWorld = sun;
+        if (m_epwLoaded)
+        {
+            const EpwLocation& loc = m_epwDocument.location;
+            const QString region = loc.stateProvince.isEmpty() ? loc.country : QString("%1, %2").arg(loc.stateProvince, loc.country);
+            state.observerLabel = QString("%1 / Observer").arg(loc.city);
+            state.locationText = QString("EPW: %1, %2 | Lat %3° Lon %4° UTC%5 | Elev %6 m")
+                .arg(loc.city, region)
+                .arg(m_latitude, 0, 'f', 4).arg(m_longitude, 0, 'f', 4)
+                .arg(m_timeZone >= 0.0 ? QString("+%1").arg(m_timeZone, 0, 'g', 4) : QString::number(m_timeZone, 'g', 4))
+                .arg(loc.elevation, 0, 'f', 0);
+        }
+        else
+        {
+            state.observerLabel = tr("Observer");
+            state.locationText = QString("Location: Lat %1° Lon %2° UTC%3")
+                .arg(m_latitude, 0, 'f', 4).arg(m_longitude, 0, 'f', 4)
+                .arg(m_timeZone >= 0.0 ? QString("+%1").arg(m_timeZone, 0, 'g', 4) : QString::number(m_timeZone, 'g', 4));
+        }
+        const int hour = static_cast<int>(std::floor(m_currentDecimalHour));
+        const int minute = static_cast<int>(std::round((m_currentDecimalHour - hour) * 60.0));
+        state.timeText = QString("Solar time sample: %1  %2:%3")
+            .arg(m_currentDate.toString("yyyy-MM-dd"))
+            .arg(hour, 2, 10, QChar('0')).arg(minute, 2, 10, QChar('0'));
+        state.sunText = QString("Sun: Az %1°  Alt %2°  ENU=(%3, %4, %5)")
+            .arg(worldEnuAzimuthDeg(sun), 0, 'f', 1)
+            .arg(worldEnuAltitudeDeg(sun), 0, 'f', 1)
+            .arg(sun.x(), 0, 'f', 3).arg(sun.y(), 0, 'f', 3).arg(sun.z(), 0, 'f', 3);
+        m_sceneWidget->setSceneState(state);
+    }
 }
 
 void CIEWidget::updateScaleInputsFromCurrentRecord()

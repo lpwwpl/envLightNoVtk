@@ -4,6 +4,7 @@
 #include <QDate>
 #include <QMainWindow>
 #include <QTimer>
+#include <QEvent>
 
 #include "EpwData.hpp"
 #include "SkyPerspectiveWidget.h"
@@ -29,6 +30,9 @@ class CIEWidget : public QMainWindow
 public:
     explicit CIEWidget(QWidget* parent = nullptr);
     ~CIEWidget();
+
+protected:
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 private slots:
     void onSkyTypeChanged(int index);

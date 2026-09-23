@@ -8,6 +8,7 @@
 #include <QPoint>
 #include <QVector3D>
 #include <QVector4D>
+#include <QString>
 
 #include <array>
 #include <memory>
@@ -40,6 +41,11 @@ struct SkySceneState
     QVector3D cameraYAxisWorld{0.0f, 0.0f, 1.0f};
     QVector3D cameraForwardWorld{0.0f, 1.0f, 0.0f};
     std::array<QVector3D, 4> frustumDirectionsWorld{QVector3D(-0.5f, 1.0f, 0.5f), QVector3D(0.5f, 1.0f, 0.5f), QVector3D(0.5f, 1.0f, -0.5f), QVector3D(-0.5f, 1.0f, -0.5f)};
+    std::vector<QVector3D> sunPathWorld;
+    QString locationText;
+    QString observerLabel;
+    QString timeText;
+    QString sunText;
 };
 
 // ================================================================
@@ -99,6 +105,9 @@ private:
 
     // 功能：绘制太阳方向线和太阳球面位置。
     void drawSun(const QMatrix4x4& mvp);
+
+    // 功能：绘制当前日期的太阳日轨迹，便于直接判断东升西落。
+    void drawSunPath(const QMatrix4x4& mvp);
 
     // 功能：绘制 Viewer Camera 位置、Xc/Yc/Zc 和四条视锥边线。
     void drawCamera(const QMatrix4x4& mvp);
